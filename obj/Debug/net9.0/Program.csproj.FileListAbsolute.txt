@@ -1,0 +1,15 @@
+/home/ziad/git/Program/bin/Debug/net9.0/Program
+/home/ziad/git/Program/bin/Debug/net9.0/Program.deps.json
+/home/ziad/git/Program/bin/Debug/net9.0/Program.runtimeconfig.json
+/home/ziad/git/Program/bin/Debug/net9.0/Program.dll
+/home/ziad/git/Program/bin/Debug/net9.0/Program.pdb
+/home/ziad/git/Program/obj/Debug/net9.0/Program.GeneratedMSBuildEditorConfig.editorconfig
+/home/ziad/git/Program/obj/Debug/net9.0/Program.AssemblyInfoInputs.cache
+/home/ziad/git/Program/obj/Debug/net9.0/Program.AssemblyInfo.cs
+/home/ziad/git/Program/obj/Debug/net9.0/Program.csproj.CoreCompileInputs.cache
+/home/ziad/git/Program/obj/Debug/net9.0/Program.sourcelink.json
+/home/ziad/git/Program/obj/Debug/net9.0/Program.dll
+/home/ziad/git/Program/obj/Debug/net9.0/refint/Program.dll
+/home/ziad/git/Program/obj/Debug/net9.0/Program.pdb
+/home/ziad/git/Program/obj/Debug/net9.0/Program.genruntimeconfig.cache
+/home/ziad/git/Program/obj/Debug/net9.0/ref/Program.dll
