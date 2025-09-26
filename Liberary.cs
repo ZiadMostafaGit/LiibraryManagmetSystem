@@ -5,47 +5,54 @@ namespace PROGRAM
 {
     using System;
     using System.Collections.Generic;
+    using System.Data.Common;
     using System.Linq;
+    using System.Runtime.CompilerServices;
 
-
-
-
-    public class BorrowedItemException : Exception {
-    public BorrowedItemException(string msg):base(msg){}
-}
-
-    public class SoldItemException : Exception {
-    public SoldItemException(string msg):base(msg){}
-}
-
-
-
-
-
-
-    public class InvalidCategoryException : Exception {
-        public InvalidCategoryException(string str):base(str){}
+    public class BorrowedItemException : Exception
+    {
+        public BorrowedItemException(string msg) : base(msg) { }
     }
 
-    public class InvlaidDurationException : Exception {
+    public class SoldItemException : Exception
+    {
+        public SoldItemException(string msg) : base(msg) { }
+    }
+
+
+
+
+
+
+    public class InvalidCategoryException : Exception
+    {
+        public InvalidCategoryException(string str) : base(str) { }
+    }
+
+    public class InvlaidDurationException : Exception
+    {
         public InvlaidDurationException(string str) : base(str) { }
     }
 
-    public class InvalidIdException : Exception {
-        public InvalidIdException(string msg):base(msg){}
-}
-    public class InvalidPhoneExeption : Exception {
-        public InvalidPhoneExeption(string msg) : base(msg){}
-}
+    public class InvalidIdException : Exception
+    {
+        public InvalidIdException(string msg) : base(msg) { }
+    }
+    public class InvalidPhoneExeption : Exception
+    {
+        public InvalidPhoneExeption(string msg) : base(msg) { }
+    }
 
-    public class InvalidBalanceValueException : Exception {
-        public InvalidBalanceValueException(string msg):base(msg){}
+    public class InvalidBalanceValueException : Exception
+    {
+        public InvalidBalanceValueException(string msg) : base(msg) { }
 
-}
+    }
 
-    public class InvalidPriceException : Exception {
-    public InvalidPriceException(string msg):base(msg){}
- }
+    public class InvalidPriceException : Exception
+    {
+        public InvalidPriceException(string msg) : base(msg) { }
+    }
 
 
 
@@ -93,6 +100,7 @@ namespace PROGRAM
 
                 }
 
+                _balance = value;
 
 
             }
@@ -160,8 +168,9 @@ namespace PROGRAM
         public decimal Price
         {
             get => _price;
-            set{
-                if (value<0)
+            set
+            {
+                if (value < 0)
                 {
                     throw new InvalidPriceException("your input is not a valid price");
                 }
@@ -243,37 +252,62 @@ namespace PROGRAM
         }
     }
 
-    // ---------------------- LIBRARY ----------------------
-    public class Library
+    public class LibraryEntry
     {
-        protected class LibraryEntry
+        public Item Item { get; set; }
+        public int Quantity { get; set; }
+        public ItemState State { get; set; } = ItemState.Avelable;
+    }
+    // ---------------------- LIBRARY ----------------------
+
+
+    public class LibraryInventory
+    {
+
+        public Dictionary<string, Dictionary<int, LibraryEntry>> data;
+
+        public IEnumerable<string> GetCategories()
         {
-            public Item Item { get; set; }
-            public int Quantity { get; set; }
-            public ItemState State { get; set; } = ItemState.Avelable;
+            return data.Keys;
         }
 
-        private Dictionary<string, Dictionary<int, LibraryEntry>> data;
-        private decimal _monyFromBorrow;
-        private decimal _monyFromSelling;
+        public IEnumerable<LibraryEntry> GetItemsInCategory(string category)
+        {
+            if (!data.ContainsKey(category))
+                return new List<LibraryEntry>();
 
-        public decimal MonyFromBorrow
-        {
-            get => _monyFromBorrow;
-            set => _monyFromBorrow = value;
-        }
-        public decimal MonyFromSelling
-        {
-            get => _monyFromSelling;
-            set => _monyFromSelling = value;
+            return data[category].Values;
         }
 
-        public Library()
+
+
+        public bool IsEmpty()
+        {
+            return this.data.Count == 0;
+        }
+
+
+        public LibraryEntry GetItem(string category, int itemId)
+        {
+            if (!this.data.ContainsKey(category))
+            {
+                throw new InvalidCategoryException("Invalid category");
+            }
+
+            if (!this.data[category].ContainsKey(itemId))
+            {
+                throw new InvalidIdException($"The item with ID {itemId} is not in the library");
+            }
+
+            return this.data[category][itemId];
+        }
+        public LibraryInventory()
         {
             data = new Dictionary<string, Dictionary<int, LibraryEntry>>();
+
         }
 
-        public bool AddItem(string key, Item i, int quantity)
+        public void AddNewItem(string key, Item i, int quantity)
         {
             if (!this.data.ContainsKey(key))
             {
@@ -283,7 +317,6 @@ namespace PROGRAM
             if (!this.data[key].ContainsKey(i.ID))
             {
                 this.data[key][i.ID] = new LibraryEntry { Item = i, Quantity = quantity };
-                return true;
             }
             else
             {
@@ -294,14 +327,13 @@ namespace PROGRAM
 
                 }
             }
-            Console.WriteLine($"Restocked {i.Title}. New quantity: {this.data[key][i.ID].Quantity}");
 
-            return true;
 
         }
 
 
-        public void BorrowItem(string category, int itemId)
+
+        public bool BorrowItem(string category, int itemId)
         {
             if (!this.data.ContainsKey(category))
             {
@@ -335,12 +367,14 @@ namespace PROGRAM
                 {
                     libraryItem.State = ItemState.Borrowed;
                 }
-                _monyFromBorrow += libraryItem.Item.Price * 0.1m;
 
             }
-                Console.WriteLine($"Successfully borrowed {libraryItem.Item.Title}");
+            return true;
 
         }
+
+
+
 
 
         public void SellItem(string category, int itemId)
@@ -352,7 +386,7 @@ namespace PROGRAM
 
             if (!this.data[category].ContainsKey(itemId))
             {
-            throw new InvalidIdException("item id dose not esist");
+                throw new InvalidIdException("item id dose not esist");
             }
 
             LibraryEntry libraryItem = this.data[category][itemId];
@@ -377,19 +411,17 @@ namespace PROGRAM
                 {
                     libraryItem.State = ItemState.Sold;
                 }
-                _monyFromSelling += libraryItem.Item.Price;
 
             }
 
-                Console.WriteLine($" {libraryItem.Item.Title} Successfully Sold");
 
         }
 
         public void ReturnItem(string category, int itemId)
         {
-            if (!this.data.ContainsKey(category) )
+            if (!this.data.ContainsKey(category))
             {
-                throw new InvalidCastException("category dose not exsist");
+                throw new InvalidCategoryException("category dose not exsist");
             }
             if (!this.data[category].ContainsKey(itemId))
             {
@@ -403,22 +435,22 @@ namespace PROGRAM
                 throw new BorrowedItemException("item is not borrowed in the first place");
             }
 
-                libraryItem.Quantity += 1;
-                libraryItem.State = ItemState.Avelable;
+            libraryItem.Quantity += 1;
+            libraryItem.State = ItemState.Avelable;
 
-                Console.WriteLine($"{libraryItem.Item.Title} returned successfully");
         }
 
         public void RestockItem(string category, int itemId, int additionalQuantity)
         {
-              if (!this.data.ContainsKey(category) )
+            if (!this.data.ContainsKey(category))
             {
-                throw new InvalidCastException("category dose not exsist");
+                throw new InvalidCategoryException("category dose not exsist");
             }
             if (!this.data[category].ContainsKey(itemId))
             {
                 throw new InvalidIdException("invalid id");
-            }else
+            }
+            else
             {
                 LibraryEntry libraryItem = this.data[category][itemId];
                 libraryItem.Quantity += additionalQuantity;
@@ -429,24 +461,89 @@ namespace PROGRAM
             }
         }
 
+
+
+
+
+    }
+
+
+
+
+
+    public class LibraryFinance
+    {
+        private Decimal _BorrowingCurrent;
+        private Decimal _sellingCurrent;
+
+
+        public LibraryFinance()
+        {
+            this._BorrowingCurrent = this._sellingCurrent = 0;
+        }
+
+        public Decimal BorrowingCurrent
+        {
+            get => _BorrowingCurrent;
+
+        }
+
+        public Decimal SellingCurrent
+        {
+            get => _sellingCurrent;
+        }
+
+        public void FinancialBorrowingTransaction(Decimal charge)
+        {
+
+
+
+            this._BorrowingCurrent += charge * 0.1m;
+        }
+
+        public void FinancialSellingTransaction(decimal charge)
+        {
+
+            this._sellingCurrent += charge;
+        }
+
+
+
+
+    }
+
+
+
+    public class LibraryReporting
+    {
+
+        private LibraryInventory Inventory;
+        private LibraryFinance Finance;
+
+        public LibraryReporting(LibraryFinance finance, LibraryInventory inventory)
+        {
+            this.Finance = finance;
+            this.Inventory = inventory;
+        }
+
         public void DisplayLibraryStatus()
         {
             Console.WriteLine("\n" + new string('=', 60));
             Console.WriteLine("                 LIBRARY STATUS REPORT");
             Console.WriteLine(new string('=', 60));
 
-            if (data.Count == 0)
+            if (this.Inventory.IsEmpty())
             {
                 Console.WriteLine("Library is empty!");
                 return;
             }
 
-            foreach (var category in data.Keys)
+            foreach (var category in this.Inventory.GetCategories())
             {
                 Console.WriteLine($"\n📚 CATEGORY: {category.ToUpper()}");
                 Console.WriteLine(new string('-', 40));
 
-                foreach (var entry in data[category].Values)
+                foreach (var entry in this.Inventory.GetItemsInCategory(category))
                 {
                     Console.WriteLine($"ID: {entry.Item.ID} | Title: {entry.Item.Title}");
                     Console.WriteLine($"   Price: ${entry.Item.Price} | Quantity: {entry.Quantity} | State: {entry.State}");
@@ -470,9 +567,9 @@ namespace PROGRAM
 
             Console.WriteLine(new string('=', 60));
             Console.WriteLine("💰 FINANCIAL SUMMARY:");
-            Console.WriteLine($"   Money from Borrowing: ${_monyFromBorrow:F2}");
-            Console.WriteLine($"   Money from Selling: ${_monyFromSelling:F2}");
-            Console.WriteLine($"   Total Revenue: ${(_monyFromBorrow + _monyFromSelling):F2}");
+            Console.WriteLine($"   Money from Borrowing: ${this.Finance.BorrowingCurrent:F2}");
+            Console.WriteLine($"   Money from Selling: ${this.Finance.SellingCurrent:F2}");
+            Console.WriteLine($"   Total Revenue: ${(this.Finance.BorrowingCurrent + this.Finance.SellingCurrent):F2}");
             Console.WriteLine(new string('=', 60));
         }
 
@@ -482,9 +579,9 @@ namespace PROGRAM
             Console.WriteLine(new string('-', 50));
 
             bool hasAvailable = false;
-            foreach (var category in data.Keys)
+            foreach (var category in this.Inventory.GetCategories())
             {
-                foreach (var entry in data[category].Values)
+                foreach (var entry in this.Inventory.GetItemsInCategory(category))
                 {
                     if (entry.Quantity > 0)
                     {
@@ -499,6 +596,107 @@ namespace PROGRAM
                 Console.WriteLine("No items currently available!");
             }
         }
+
+
+
+    }
+
+
+
+
+
+
+    public class Library
+    {
+
+
+
+        private LibraryFinance finance;
+        private LibraryInventory inventory;
+        private LibraryReporting report;
+
+
+        public Library()
+        {
+            inventory = new LibraryInventory();
+            finance = new LibraryFinance();
+            report = new LibraryReporting(finance, inventory);
+        }
+
+
+        public void AddNewItem(string key, Item i, int quantity)
+        {
+            this.inventory.AddNewItem(key, i, quantity);
+            var libitem = inventory.GetItem(key, i.ID);
+            Console.WriteLine($"Restocked {libitem.Item.Title}. New quantity: {libitem.Quantity}");
+
+        }
+
+        public void BorrowItem(string category, int itemId)
+        {
+            try
+            {
+                var libitem = this.inventory.GetItem(category, itemId);
+                this.inventory.BorrowItem(category, itemId);
+
+                this.finance.FinancialBorrowingTransaction(libitem.Item.Price);
+                Console.WriteLine("Borrow transaction completed successfully");
+            }
+            catch (Exception err)
+            {
+                Console.WriteLine(err);
+            }
+        }
+
+        public void SellItem(string category, int itemId)
+        {
+            try
+            {
+                var libitem = this.inventory.GetItem(category, itemId);
+                this.inventory.SellItem(category, itemId);
+
+                this.finance.FinancialSellingTransaction(libitem.Item.Price);
+                Console.WriteLine("Selling transaction completed successfully");
+            }
+            catch (Exception err)
+            {
+                Console.WriteLine(err);
+            }
+        }
+
+        public void ReturnItem(string category, int itemId)
+        {
+            try
+            {
+                this.inventory.ReturnItem(category, itemId);
+                Console.WriteLine("Item returned successfully");
+            }
+            catch (Exception err)
+            {
+                Console.WriteLine(err);
+            }
+        }
+
+        public void RestockItem(string category, int itemId, int quantity)
+        {
+            this.inventory.RestockItem(category, itemId, quantity);
+        }
+
+
+        public void DesplayLibraryStatus()
+        {
+            this.report.DisplayLibraryStatus();
+        }
+
+        public void DesplayAvelableItem()
+        {
+            this.report.DisplayAvailableItems();
+        }
+
+
+
+
+
     }
 
 
@@ -506,23 +704,17 @@ namespace PROGRAM
 
     public enum CustomerItemState
     {
-        buyed,
-        borrowed,
+        Bought,
+        Borrowed,
     }
-
-
 
     public class Customer : User
     {
-
-
         private class CustomerItem
         {
             public Item item { get; set; }
-            public CustomerItemState custoemrItemSate { get; set; }
+            public CustomerItemState customerItemState { get; set; }
         }
-
-
 
         private List<CustomerItem> CustomerItems;
 
@@ -535,7 +727,7 @@ namespace PROGRAM
         {
             CustomerItem citem = new CustomerItem();
             citem.item = item;
-            citem.custoemrItemSate = CustomerItemState.buyed;
+            citem.customerItemState = CustomerItemState.Bought;
             this.CustomerItems.Add(citem);
         }
 
@@ -543,162 +735,108 @@ namespace PROGRAM
         {
             CustomerItem citem = new CustomerItem();
             citem.item = item;
-            citem.custoemrItemSate = CustomerItemState.borrowed;
+            citem.customerItemState = CustomerItemState.Borrowed;
             this.CustomerItems.Add(citem);
         }
 
-
-        public void DecreseBalance(Decimal cost)
+        public void DecreaseBalance(Decimal cost)
         {
-            if (Balance <cost)
+            if (Balance < cost)
             {
                 throw new InvalidBalanceValueException("balance is less than cost");
             }
             _balance -= cost;
         }
+
         public void IncreaseBalance(Decimal cost)
         {
             _balance += cost;
-        
         }
-
-
-
-
-
-
-
-
-
-
-
     }
 
-
-
-public class TransactionService
-{
-    public bool CustomerBuyItem(Library library, Customer customer, string category, Item item)
+    public class TransactionService
     {
-        try
+        public bool CustomerBuyItem(Library library, Customer customer, string category, Item item)
         {
-            customer.DecreseBalance(item.Price);    
-            library.SellItem(category, item.ID);   
-            customer.BuyItem(item);
+            bool balanceDecreased = false;
+            try
+            {
+                customer.DecreaseBalance(item.Price);
+                balanceDecreased = true;
 
-            Console.WriteLine("Customer bought the item successfully");
-            return true;
+                library.SellItem(category, item.ID);
+
+                customer.BuyItem(item);
+
+                Console.WriteLine("Customer bought the item successfully");
+                return true;
+            }
+            catch (InvalidBalanceValueException ex)
+            {
+                Console.WriteLine($"Purchase failed: {ex.Message}");
+                return false;
+            }
+            catch (Exception ex)
+            {
+                if (balanceDecreased)
+                {
+                    customer.IncreaseBalance(item.Price);
+                    Console.WriteLine("Balance restored due to purchase failure");
+                }
+                Console.WriteLine($"Purchase failed: {ex.Message}");
+                return false;
+            }
         }
-        catch (InvalidBalanceValueException ex)
+
+        public bool CustomerBorrowItem(Library library, Customer customer, string category, Item item)
         {
-            Console.WriteLine($"❌ Purchase failed: {ex.Message}");
-            return false;
+            bool balanceDecreased = false;
+            decimal borrowingFee = item.Price * 0.1m;
+
+            try
+            {
+                customer.DecreaseBalance(borrowingFee);
+                balanceDecreased = true;
+
+                library.BorrowItem(category, item.ID);
+
+                customer.BorrowItem(item);
+
+                Console.WriteLine($"Customer borrowed the item successfully. Fee charged: ${borrowingFee:F2}");
+                return true;
+            }
+            catch (InvalidBalanceValueException ex)
+            {
+                Console.WriteLine($"Borrow failed: {ex.Message}");
+                return false;
+            }
+            catch (Exception ex)
+            {
+                if (balanceDecreased)
+                {
+                    customer.IncreaseBalance(borrowingFee);
+                    Console.WriteLine("Balance restored due to borrow failure");
+                }
+                Console.WriteLine($"Borrow failed: {ex.Message}");
+                return false;
+            }
         }
-        catch (InvalidCategoryException ex)
+
+        public bool CustomerReturnItem(Library library, Customer customer, string category, int itemId)
         {
-            Console.WriteLine($"❌ Purchase failed: {ex.Message}");
-            return false;
-        }
-        catch (InvalidIdException ex)
-        {
-            Console.WriteLine($"❌ Purchase failed: {ex.Message}");
-            return false;
-        }
-        catch (BorrowedItemException ex)
-        {
-            Console.WriteLine($"❌ Purchase failed: {ex.Message}");
-            return false;
-        }
-        catch (SoldItemException ex)
-        {
-            Console.WriteLine($"❌ Purchase failed: {ex.Message}");
-            return false;
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"❌ Unexpected error during purchase: {ex.Message}");
-            return false;
+            try
+            {
+                library.ReturnItem(category, itemId);
+                Console.WriteLine("Customer returned the item successfully");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Return failed: {ex.Message}");
+                return false;
+            }
         }
     }
-
-    public bool CustomerBorrowItem(Library library, Customer customer, string category, Item item)
-    {
-        try
-        {
-            library.BorrowItem(category, item.ID);   
-            customer.BorrowItem(item);
-
-            Console.WriteLine("Customer borrowed the item successfully");
-            return true;
-        }
-        catch (InvalidCategoryException ex)
-        {
-            Console.WriteLine($"❌ Borrow failed: {ex.Message}");
-            return false;
-        }
-        catch (InvalidIdException ex)
-        {
-            Console.WriteLine($"❌ Borrow failed: {ex.Message}");
-            return false;
-        }
-        catch (BorrowedItemException ex)
-        {
-            Console.WriteLine($"❌ Borrow failed: {ex.Message}");
-            return false;
-        }
-        catch (SoldItemException ex)
-        {
-            Console.WriteLine($"❌ Borrow failed: {ex.Message}");
-            return false;
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"❌ Unexpected error during borrowing: {ex.Message}");
-            return false;
-        }
-    }
-
-    public bool CustomerReturnItem(Library library, Customer customer, string category, int itemId)
-    {
-        try
-        {
-            library.ReturnItem(category, itemId);   
-            Console.WriteLine("Customer returned the item successfully");
-            return true;
-        }
-        catch (InvalidCategoryException ex)
-        {
-            Console.WriteLine($"❌ Return failed: {ex.Message}");
-            return false;
-        }
-        catch (InvalidIdException ex)
-        {
-            Console.WriteLine($"❌ Return failed: {ex.Message}");
-            return false;
-        }
-        catch (BorrowedItemException ex)
-        {
-            Console.WriteLine($"❌ Return failed: {ex.Message}");
-            return false;
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"❌ Unexpected error during return: {ex.Message}");
-            return false;
-        }
-    }
-}
-
-
-
-
-
-
-
-
-
-
-
 
 
 }
