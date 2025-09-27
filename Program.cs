@@ -3,221 +3,168 @@ namespace PROGRAM
 {
 
 
+
 class Program
 {
     static void Main(string[] args)
     {
-        Console.WriteLine("=== COMPREHENSIVE LIBRARY SYSTEM TEST ===\n");
+        Console.WriteLine("=== LIBRARY SYSTEM FUNCTIONALITY TESTS ===\n");
 
-        // Initialize the system
-        Library library = new Library();
-        TransactionService transactionService = new TransactionService();
-        
-        // Create test customers
-        Customer richCustomer = new Customer("John Doe", "1234567890", 1000m);
-        Customer poorCustomer = new Customer("Jane Smith", "0987654321", 5m);
-        
-        Console.WriteLine("📋 INITIAL SETUP COMPLETE");
-        Console.WriteLine($"Rich Customer Balance: ${richCustomer.Balance}");
-        Console.WriteLine($"Poor Customer Balance: ${poorCustomer.Balance}\n");
+    // 1. Test Item Creation and Validation (Expanded)
+    Console.WriteLine("--- Item Creation and Validation (Expanded) ---");
+    // Valid Book
+    try { var b = new Book(0, "lowercase title", 0m, "lowercase author"); b.DisplayInfo(); } catch (Exception e) { Console.WriteLine(e.Message); }
+    try { var b = new Book(10000, "UPPERCASE TITLE", 99999.99m, "UPPERCASE AUTHOR"); b.DisplayInfo(); } catch (Exception e) { Console.WriteLine(e.Message); }
+    // Valid Magazine
+    try { var m = new Magazine(0, "magazine", 0m, 1000); m.DisplayInfo(); } catch (Exception e) { Console.WriteLine(e.Message); }
+    try { var m = new Magazine(10000, "MAGAZINE", 99999.99m, 2026); m.DisplayInfo(); } catch (Exception e) { Console.WriteLine(e.Message); }
+    // Valid DVD
+    try { var d = new DVD(0, "dvd", 0m, 0.0); d.DisplayInfo(); } catch (Exception e) { Console.WriteLine(e.Message); }
+    try { var d = new DVD(10000, "DVD", 99999.99m, 10.0); d.DisplayInfo(); } catch (Exception e) { Console.WriteLine(e.Message); }
 
-        // Create test items
-        Book book1 = new Book(1, "Harry Potter", 25.99m, "J.K. Rowling");
-        Book book2 = new Book(2, "Lord of the Rings", 35.50m, "J.R.R. Tolkien");
-        Magazine mag1 = new Magazine(3, "National Geographic", 5.99m, 2024);
-        DVD dvd1 = new DVD(4, "Inception", 19.99m, 2.5);
-        DVD dvd2 = new DVD(5, "The Matrix", 15.99m, 2.2);
+    // Invalid Book IDs
+    try { var b = new Book(-1, "Bad", 10m, "A"); } catch (Exception e) { Console.WriteLine("Expected: " + e.Message); }
+    try { var b = new Book(10001, "Bad", 10m, "A"); } catch (Exception e) { Console.WriteLine("Expected: " + e.Message); }
+    // Invalid Book Price
+    try { var b = new Book(1, "Bad", -0.01m, "A"); } catch (Exception e) { Console.WriteLine("Expected: " + e.Message); }
+    // Book casing
+    try { var b = new Book(2, "MiXeD CaSe", 10m, "MiXeD CaSe"); b.DisplayInfo(); } catch (Exception e) { Console.WriteLine(e.Message); }
 
-        Console.WriteLine("=== TESTING ITEM CREATION ===");
-        book1.DisplayInfo();
-        mag1.DisplayInfo();
-        dvd1.DisplayInfo();
-        Console.WriteLine();
+    // Invalid Magazine IDs
+    try { var m = new Magazine(-1, "Bad", 1m, 2020); } catch (Exception e) { Console.WriteLine("Expected: " + e.Message); }
+    try { var m = new Magazine(10001, "Bad", 1m, 2020); } catch (Exception e) { Console.WriteLine("Expected: " + e.Message); }
+    // Invalid Magazine Price
+    try { var m = new Magazine(1, "Bad", -0.01m, 2020); } catch (Exception e) { Console.WriteLine("Expected: " + e.Message); }
+    // Invalid Magazine Year (too old, too new)
+    try { var m = new Magazine(1, "Bad", 1m, 999); } catch (Exception e) { Console.WriteLine("Expected: " + e.Message); }
+    try { var m = new Magazine(1, "Bad", 1m, 2027); } catch (Exception e) { Console.WriteLine("Expected: " + e.Message); }
 
-        // Test adding items to library
-        Console.WriteLine("=== TESTING LIBRARY INVENTORY ===");
-        library.AddNewItem("Books", book1, 3);
-        library.AddNewItem("Books", book2, 2);
-        library.AddNewItem("Magazines", mag1, 5);
-        library.AddNewItem("DVDs", dvd1, 1);
-        library.AddNewItem("DVDs", dvd2, 4);
-        
-        // Test restocking
-        Console.WriteLine("\n--- Testing Restocking ---");
-        library.RestockItem("Books", 1, 2);
-        
-        // Display initial library status
-        Console.WriteLine("\n--- Initial Library Status ---");
-        library.DesplayLibraryStatus();
+    // Invalid DVD IDs
+    try { var d = new DVD(-1, "Bad", 1m, 1.0); } catch (Exception e) { Console.WriteLine("Expected: " + e.Message); }
+    try { var d = new DVD(10001, "Bad", 1m, 1.0); } catch (Exception e) { Console.WriteLine("Expected: " + e.Message); }
+    // Invalid DVD Price
+    try { var d = new DVD(1, "Bad", -0.01m, 1.0); } catch (Exception e) { Console.WriteLine("Expected: " + e.Message); }
+    // Invalid DVD Duration
+    try { var d = new DVD(1, "Bad", 1m, -0.01); } catch (Exception e) { Console.WriteLine("Expected: " + e.Message); }
+    try { var d = new DVD(1, "Bad", 1m, 10.01); } catch (Exception e) { Console.WriteLine("Expected: " + e.Message); }
+    // DVD casing
+    try { var d = new DVD(2, "MiXeD CaSe", 10m, 2.0); d.DisplayInfo(); } catch (Exception e) { Console.WriteLine(e.Message); }
 
-        // Display available items
+    // 2. Test User Creation and Validation (Expanded)
+    Console.WriteLine("\n--- User Creation and Validation (Expanded) ---");
+    // Valid Customer
+    try { var c = new Customer("Valid User", "01234567890", 100m); Console.WriteLine($"Customer: {c.Name}, {c.Phone}, {c.Balance}"); } catch (Exception e) { Console.WriteLine(e.Message); }
+    // Empty name
+    try { var c = new Customer("", "01234567890", 100m); Console.WriteLine($"Customer: '{c.Name}'"); } catch (Exception e) { Console.WriteLine("Expected: " + e.Message); }
+    // Whitespace name
+    try { var c = new Customer("   ", "01234567890", 100m); Console.WriteLine($"Customer: '{c.Name}'"); } catch (Exception e) { Console.WriteLine("Expected: " + e.Message); }
+    // Name casing
+    try { var c = new Customer("MiXeD CaSe", "01234567890", 100m); Console.WriteLine($"Customer: {c.Name}"); } catch (Exception e) { Console.WriteLine(e.Message); }
+    // Min phone (all zeros)
+    try { var c = new Customer("MinPhone", "00000000000", 100m); Console.WriteLine($"Customer: {c.Phone}"); } catch (Exception e) { Console.WriteLine(e.Message); }
+    // Max phone (all nines, 10 digits)
+    try { var c = new Customer("MaxPhone", "99999999999", 100m); Console.WriteLine($"Customer: {c.Phone}"); } catch (Exception e) { Console.WriteLine(e.Message); }
+    // Invalid phone (letters)
+    try { var c = new Customer("Bad Phone", "abc123", 100m); } catch (Exception e) { Console.WriteLine("Expected: " + e.Message); }
+    // Invalid phone (special chars)
+    try { var c = new Customer("Bad Phone", "0123-456-7890", 100m); } catch (Exception e) { Console.WriteLine("Expected: " + e.Message); }
+    // Invalid phone (too short)
+    try { var c = new Customer("ShortPhone", "12345", 100m); Console.WriteLine($"Customer: {c.Phone}"); } catch (Exception e) { Console.WriteLine(e.Message); }
+    // Invalid phone (too long)
+    try { var c = new Customer("LongPhone", "123456789012345", 100m); Console.WriteLine($"Customer: {c.Phone}"); } catch (Exception e) { Console.WriteLine(e.Message); }
+    // Min balance (zero)
+    try { var c = new Customer("ZeroBalance", "1234567890", 0m); Console.WriteLine($"Customer: {c.Balance}"); } catch (Exception e) { Console.WriteLine(e.Message); }
+    // Max balance (large value)
+    try { var c = new Customer("MaxBalance", "1234567890", decimal.MaxValue); Console.WriteLine($"Customer: {c.Balance}"); } catch (Exception e) { Console.WriteLine(e.Message); }
+    // Negative balance
+    try { var c = new Customer("Negative Balance", "1234567890", -10m); } catch (Exception e) { Console.WriteLine("Expected: " + e.Message); }
+    // Duplicate phone (should be allowed, as no check in logic)
+    try { var c1 = new Customer("User1", "5555555555", 10m); var c2 = new Customer("User2", "5555555555", 20m); Console.WriteLine($"Duplicate phone customers created: {c1.Phone}, {c2.Phone}"); } catch (Exception e) { Console.WriteLine(e.Message); }
+
+        // 3. Test Library Inventory Operations
+        Console.WriteLine("\n--- Library Inventory Operations ---");
+        Library lib = new Library();
+        Book bookA = new Book(100, "Book A", 20m, "Author A");
+        Book bookB = new Book(101, "Book B", 30m, "Author B");
+        Magazine magA = new Magazine(200, "Mag A", 5m, 2024);
+        DVD dvdA = new DVD(300, "DVD A", 15m, 1.5);
+        lib.AddNewItem("Books", bookA, 2);
+        lib.AddNewItem("Books", bookB, 1);
+        lib.AddNewItem("Magazines", magA, 3);
+        lib.AddNewItem("DVDs", dvdA, 1);
+        lib.DesplayLibraryStatus();
+
+        // 4. Test Restocking
+        Console.WriteLine("\n--- Restocking ---");
+        lib.RestockItem("Books", 100, 3);
+        lib.DesplayLibraryStatus();
+
+        // 5. Test Borrowing, Selling, Returning (Direct Library)
+        Console.WriteLine("\n--- Direct Borrowing ---");
+        lib.BorrowItem("Books", 100); // Should succeed
+        lib.BorrowItem("Books", 100); // Should succeed
+        lib.BorrowItem("Books", 100); // Should succeed
+        lib.BorrowItem("Books", 100); // Should succeed
+        lib.BorrowItem("Books", 100); // Should succeed
+        lib.BorrowItem("Books", 100); // Should fail (no more left)
+
+
+        Console.WriteLine("\n--- Direct Selling ---");
+        lib.SellItem("Books", 101); // Should succeed
+        lib.SellItem("Books", 101); // Should fail (no more left)
+
+        Console.WriteLine("\n--- Direct Returning ---");
+        lib.ReturnItem("Books", 100); // Should succeed
+        lib.ReturnItem("Books", 100); // Should fail (not borrowed)
+
+        // 6. Test Display Available Items
         Console.WriteLine("\n--- Available Items ---");
-        library.DesplayAvelableItem();
+        lib.DesplayAvelableItem();
 
-        // Test direct library operations
-        Console.WriteLine("\n=== TESTING DIRECT LIBRARY OPERATIONS ===");
-        
-        // Test borrowing
-        Console.WriteLine("\n--- Testing Library Borrowing ---");
-        library.BorrowItem("Books", 1);
-        library.BorrowItem("DVDs", 4); // Should work
-        library.BorrowItem("DVDs", 4); // Should fail - only 1 copy, now borrowed
-        
-        // Test selling
-        Console.WriteLine("\n--- Testing Library Selling ---");
-        library.SellItem("Books", 2);
-        library.SellItem("Magazines", 3);
-        
-        // Test returning
-        Console.WriteLine("\n--- Testing Library Returning ---");
-        library.ReturnItem("Books", 1);
-        library.ReturnItem("DVDs", 4);
-        
-        // Show updated status
-        Console.WriteLine("\n--- Library Status After Direct Operations ---");
-        library.DesplayLibraryStatus();
+        // 7. Test TransactionService (Customer Buy/Borrow/Return)
+        Console.WriteLine("\n--- TransactionService: Customer Buy/Borrow/Return ---");
+        TransactionService ts = new TransactionService();
+        Customer cust = new Customer("Alice", "1112223333", 100m);
+        ts.CustomerBuyItem(lib, cust, "Magazines", magA); // Should succeed
+        ts.CustomerBuyItem(lib, cust, "Magazines", magA); // Should succeed
+        ts.CustomerBuyItem(lib, cust, "Magazines", magA); // Should succeed
+        ts.CustomerBuyItem(lib, cust, "Magazines", magA); // Should fail (no more left)
 
-        // Test customer transactions
-        Console.WriteLine("\n=== TESTING CUSTOMER TRANSACTIONS ===");
-        
-        // Test successful customer buying
-        Console.WriteLine("\n--- Rich Customer Buying Items ---");
-        Console.WriteLine($"Rich Customer Balance Before: ${richCustomer.Balance}");
-        transactionService.CustomerBuyItem(library, richCustomer, "Books", book2);
-        transactionService.CustomerBuyItem(library, richCustomer, "DVDs", dvd2);
-        Console.WriteLine($"Rich Customer Balance After: ${richCustomer.Balance}");
-        
-        // Test customer borrowing
-        Console.WriteLine("\n--- Rich Customer Borrowing Items ---");
-        Console.WriteLine($"Rich Customer Balance Before: ${richCustomer.Balance}");
-        transactionService.CustomerBorrowItem(library, richCustomer, "Books", book1);
-        transactionService.CustomerBorrowItem(library, richCustomer, "Magazines", mag1);
-        Console.WriteLine($"Rich Customer Balance After: ${richCustomer.Balance}");
-        
-        // Test customer returning
-        Console.WriteLine("\n--- Customer Returning Items ---");
-        transactionService.CustomerReturnItem(library, richCustomer, "Books", 1);
-        transactionService.CustomerReturnItem(library, richCustomer, "Magazines", 3);
-        
-        // Test poor customer transactions (should fail due to insufficient funds)
-        Console.WriteLine("\n--- Poor Customer Attempting Expensive Purchase ---");
-        Console.WriteLine($"Poor Customer Balance: ${poorCustomer.Balance}");
-        transactionService.CustomerBuyItem(library, poorCustomer, "Books", book1); // Should fail
-        
-        // Test poor customer borrowing (should work)
-        Console.WriteLine("\n--- Poor Customer Borrowing (Should Work) ---");
-        Console.WriteLine($"Poor Customer Balance Before: ${poorCustomer.Balance}");
-        transactionService.CustomerBorrowItem(library, poorCustomer, "Books", book1);
-        Console.WriteLine($"Poor Customer Balance After: ${poorCustomer.Balance}");
+        // Borrowing
+        ts.CustomerBorrowItem(lib, cust, "DVDs", dvdA); // Should succeed
+        ts.CustomerBorrowItem(lib, cust, "DVDs", dvdA); // Should fail (no more left)
 
-        // Test error scenarios
-        Console.WriteLine("\n=== TESTING ERROR SCENARIOS ===");
-        
-        Console.WriteLine("\n--- Testing Invalid Category ---");
-        library.BorrowItem("InvalidCategory", 1);
-        
-        Console.WriteLine("\n--- Testing Invalid Item ID ---");
-        library.BorrowItem("Books", 999);
-        
-        Console.WriteLine("\n--- Testing Borrowing Already Borrowed Item ---");
-        library.BorrowItem("Books", 1); // Should be available now
-        library.BorrowItem("Books", 1); // Should fail - only 1 left after previous operations
-        
-        Console.WriteLine("\n--- Testing Return of Non-Borrowed Item ---");
-        library.ReturnItem("DVDs", 5); // This item was never borrowed
+        // Returning
+        ts.CustomerReturnItem(lib, cust, "DVDs", 300); // Should succeed
+        ts.CustomerReturnItem(lib, cust, "DVDs", 300); // Should fail (not borrowed)
 
-        // Test rollback scenarios
-        Console.WriteLine("\n=== TESTING ROLLBACK SCENARIOS ===");
-        
-        // Create an item that exists in inventory but will cause library operation to fail
-        Console.WriteLine("\n--- Testing Purchase Rollback ---");
-        Customer testCustomer = new Customer("Test User", "5555555555", 50m);
-        Console.WriteLine($"Test Customer Balance Before: ${testCustomer.Balance}");
-        
-        // Try to buy an item that doesn't exist - should rollback balance
-        transactionService.CustomerBuyItem(library, testCustomer, "Books", new Book(999, "Non-Existent", 20m, "Nobody"));
-        Console.WriteLine($"Test Customer Balance After Failed Purchase: ${testCustomer.Balance}");
+        // 8. Test Insufficient Balance
+        Console.WriteLine("\n--- Insufficient Balance ---");
+        Customer poor = new Customer("Bob", "9998887777", 1m);
+        ts.CustomerBuyItem(lib, poor, "Books", bookA); // Should fail
+        ts.CustomerBorrowItem(lib, poor, "Books", bookA); // Should fail
 
-        // Test invalid user creation scenarios
-        Console.WriteLine("\n=== TESTING INVALID USER CREATION ===");
-        try
-        {
-            Customer invalidCustomer = new Customer("Invalid", "abc123", 100m); // Invalid phone
-        }
-        catch (Exception e)
-        {
-            Console.WriteLine($"Expected error for invalid phone: {e.Message}");
-        }
-        
-        try
-        {
-            Customer negativeBalanceCustomer = new Customer("Negative", "1111111111", -50m); // Negative balance
-        }
-        catch (Exception e)
-        {
-            Console.WriteLine($"Expected error for negative balance: {e.Message}");
-        }
+        // 9. Test Invalid Category/ID
+        Console.WriteLine("\n--- Invalid Category/ID ---");
+        lib.BorrowItem("Nonexistent", 100);
+        lib.SellItem("Books", 9999);
+        lib.ReturnItem("Magazines", 9999);
 
-        // Test invalid item creation
-        Console.WriteLine("\n=== TESTING INVALID ITEM CREATION ===");
-        try
-        {
-            Book invalidBook = new Book(-1, "Invalid", 10m, "Author"); // Invalid ID
-        }
-        catch (Exception e)
-        {
-            Console.WriteLine($"Expected error for invalid book ID: {e.Message}");
-        }
-        
-        try
-        {
-            Book negativePrice = new Book(100, "Free Book", -5m, "Author"); // Negative price
-        }
-        catch (Exception e)
-        {
-            Console.WriteLine($"Expected error for negative price: {e.Message}");
-        }
-        
-        try
-        {
-            Magazine futureMag = new Magazine(101, "Future Mag", 5m, 2030); // Future date
-        }
-        catch (Exception e)
-        {
-            Console.WriteLine($"Expected error for future date: {e.Message}");
-        }
-        
-        try
-        {
-            DVD longDVD = new DVD(102, "Long Movie", 10m, 15.5); // Invalid duration
-        }
-        catch (Exception e)
-        {
-            Console.WriteLine($"Expected error for invalid duration: {e.Message}");
-        }
+        // 10. Test Rollback on Failure
+        Console.WriteLine("\n--- Rollback on Failure ---");
+        Customer rollback = new Customer("Rollback", "1231231234", 50m);
+        Book fakeBook = new Book(9999, "Fake", 10m, "Nobody");
+        ts.CustomerBuyItem(lib, rollback, "Books", fakeBook); // Should fail and restore balance
+        ts.CustomerBorrowItem(lib, rollback, "Books", fakeBook); // Should fail and restore balance
 
-        // Final library status and financial report
-        Console.WriteLine("\n=== FINAL SYSTEM STATUS ===");
-        library.DesplayLibraryStatus();
-        
-        Console.WriteLine("\n=== CUSTOMER FINAL BALANCES ===");
-        Console.WriteLine($"Rich Customer Final Balance: ${richCustomer.Balance}");
-        Console.WriteLine($"Poor Customer Final Balance: ${poorCustomer.Balance}");
-        Console.WriteLine($"Test Customer Final Balance: ${testCustomer.Balance}");
+        // 11. Final Status
+        Console.WriteLine("\n--- Final Library Status ---");
+        lib.DesplayLibraryStatus();
+        Console.WriteLine("\n--- Final Available Items ---");
+        lib.DesplayAvelableItem();
 
-        Console.WriteLine("\n=== AVAILABLE ITEMS FOR FUTURE TRANSACTIONS ===");
-        library.DesplayAvelableItem();
-
-        Console.WriteLine("\n=== TEST COMPLETION ===");
-        Console.WriteLine("All system components tested successfully!");
-        Console.WriteLine("- Library inventory management");
-        Console.WriteLine("- Financial transactions");
-        Console.WriteLine("- Customer operations");
-        Console.WriteLine("- Error handling and validation");
-        Console.WriteLine("- Rollback mechanisms");
-        Console.WriteLine("- Single Responsibility Principle implementation");
-        
-        Console.WriteLine("\nPress any key to exit...");
+        Console.WriteLine("\n=== ALL TESTS COMPLETED ===");
+        Console.WriteLine("Press any key to exit...");
         Console.ReadKey();
     }
 }

@@ -1,5 +1,6 @@
 using System.Reflection;
 using System.Reflection.Metadata.Ecma335;
+using System.Text.RegularExpressions;
 
 namespace PROGRAM
 {
@@ -12,11 +13,6 @@ namespace PROGRAM
     public class BorrowedItemException : Exception
     {
         public BorrowedItemException(string msg) : base(msg) { }
-    }
-
-    public class SoldItemException : Exception
-    {
-        public SoldItemException(string msg) : base(msg) { }
     }
 
 
@@ -38,9 +34,9 @@ namespace PROGRAM
     {
         public InvalidIdException(string msg) : base(msg) { }
     }
-    public class InvalidPhoneExeption : Exception
+    public class InvalidPhoneException : Exception
     {
-        public InvalidPhoneExeption(string msg) : base(msg) { }
+        public InvalidPhoneException(string msg) : base(msg) { }
     }
 
     public class InvalidBalanceValueException : Exception
@@ -53,7 +49,10 @@ namespace PROGRAM
     {
         public InvalidPriceException(string msg) : base(msg) { }
     }
-
+public class SoldItemException : Exception
+    {
+        public SoldItemException(string msg) : base(msg) { }
+    }
 
 
     public enum ItemState
@@ -73,20 +72,62 @@ namespace PROGRAM
         public string Name
         {
             get => _name;
-            set => _name = value.Trim();
-        }
-        public string Phone
-        {
-            get => _phone;
             set
             {
-                if (!value.All(char.IsDigit))
+                if (string.IsNullOrWhiteSpace(value))
                 {
-                    throw new InvalidPhoneExeption("input has non digit characters");
+                    throw new ArgumentException("Name cannot be empty or whitespace.");
                 }
-                _phone = value;
+                if (value.All(char.IsDigit))
+                {
+                    throw new ArgumentException("Name cannot be digits.");
+                }
+                _name = value.Trim().ToUpper();
             }
         }
+       public string Phone
+{
+    get => _phone;
+    set
+    {
+        string cleanedValue = Regex.Replace(value, @"[^\d]", "");
+
+        if (!cleanedValue.All(char.IsDigit))
+        {
+            throw new InvalidPhoneException("Input has non-digit characters.");
+        }
+
+        if (cleanedValue.Length != 11)
+        {
+            throw new InvalidPhoneException("Phone number must be 11 digits.");
+        }
+
+        if (!cleanedValue.StartsWith("01"))
+        {
+            throw new InvalidPhoneException("Phone number must start with 01.");
+        }
+
+        int counterOfRepeatedDigits = 1;
+        for (int i = 1; i < cleanedValue.Length; i++)
+        {
+            if (cleanedValue[i] == cleanedValue[i - 1])
+            {
+                counterOfRepeatedDigits++;
+                if (counterOfRepeatedDigits > 3)
+                {
+                    throw new InvalidPhoneException("Phone number has more than 3 repeated digits.");
+                }
+            }
+            else
+            {
+                counterOfRepeatedDigits = 1;
+            }
+        }
+
+        _phone = cleanedValue;
+    }
+}
+
 
         public Decimal Balance
         {
@@ -135,6 +176,12 @@ namespace PROGRAM
         protected int _id;
         protected string _title;
         protected decimal _price;
+        protected decimal _itemState;
+
+        public decimal ItemState{ get; set; }
+
+
+
 
         protected Item(int id, string title, decimal price)
         {
@@ -143,6 +190,7 @@ namespace PROGRAM
 
             _id = id;
             _title = title.ToUpper();
+            _itemState = ItemState.Avelable;
             _price = price >= 0 ? price : throw new InvalidPriceException("Price must be >= 0");
         }
 
@@ -257,6 +305,7 @@ namespace PROGRAM
         public Item Item { get; set; }
         public int Quantity { get; set; }
         public ItemState State { get; set; } = ItemState.Avelable;
+
     }
     // ---------------------- LIBRARY ----------------------
 
@@ -430,13 +479,18 @@ namespace PROGRAM
 
             LibraryEntry libraryItem = this.data[category][itemId];
 
-            if (libraryItem.State != ItemState.Borrowed)
+            if (libraryItem.State == ItemState.Sold)
             {
-                throw new BorrowedItemException("item is not borrowed in the first place");
+                throw new SoldItemException($"item {itemId} is sold and cant be returned");
+            }
+            if (libraryItem.State == ItemState.Borrowed)
+            {
+                libraryItem.State = ItemState.Avelable;
+
             }
 
             libraryItem.Quantity += 1;
-            libraryItem.State = ItemState.Avelable;
+            
 
         }
 
@@ -693,7 +747,11 @@ namespace PROGRAM
             this.report.DisplayAvailableItems();
         }
 
-
+        public void GetItemQuantity(string category, int itemId)
+        {
+            var libitem = this.inventory.GetItem(category, itemId);
+            Console.WriteLine($"Item '{libitem.Item.Title}' (ID: {itemId}) has quantity: {libitem.Quantity}");
+        }
 
 
 
