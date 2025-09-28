@@ -2,11 +2,7 @@ namespace PROGRAM
 {
     using System;
     using System.Collections.Generic;
-    using System.Diagnostics.Metrics;
     using System.Linq;
-    using System.Reflection.Emit;
-    using System.Security.Cryptography;
-    using System.Security.Principal;
     using System.Text.RegularExpressions;
 
     // ---------------------- EXCEPTIONS ----------------------
@@ -104,7 +100,7 @@ namespace PROGRAM
         protected decimal _price;
         protected ItemState _state;
 
-        // New: track inventory index for quick return
+        // keep this - helps later for O(1) ops if we need them
         public int InventoryIndex { get; set; }
 
         public ItemState State
@@ -218,156 +214,240 @@ namespace PROGRAM
         }
     }
 
+    // ---------------------- LIBRARY INVENTORY (keeps your style) ----------------------
     public class LibraryInventory
     {
+        // global items list (each copy is an Item instance)
         private List<Item> items;
-        public Dictionary<string, Dictionary<string, Queue<int>>> data;
+
+        // catalog[category][title] => list of indices into items
+        private Dictionary<string, Dictionary<string, List<int>>> catalog;
 
         public LibraryInventory()
         {
             items = new List<Item>();
-            data = new Dictionary<string, Dictionary<string, Queue<int>>>();
+            // ignore case on categories/titles so front-end can pass any case
+            catalog = new Dictionary<string, Dictionary<string, List<int>>>(StringComparer.OrdinalIgnoreCase);
         }
 
+        // add quantity copies of the given 'item' (we clone so caller's instance isn't reused)
         public void AddNewItem(string category, Item item, int quantity)
         {
-            if (!data.ContainsKey(category))
-                data[category] = new Dictionary<string, Queue<int>>();
+            if (string.IsNullOrWhiteSpace(category))
+                throw new ArgumentException("category required");
+            if (item == null)
+                throw new ArgumentNullException(nameof(item));
+            if (quantity <= 0)
+                throw new ArgumentException("quantity must be > 0");
 
-            if (!data[category].ContainsKey(item.Title))
-                data[category][item.Title] = new Queue<int>();
+            if (!catalog.ContainsKey(category))
+                catalog[category] = new Dictionary<string, List<int>>(StringComparer.OrdinalIgnoreCase);
+
+            if (!catalog[category].ContainsKey(item.Title))
+                catalog[category][item.Title] = new List<int>();
 
             for (int i = 0; i < quantity; i++)
             {
-                items.Add(item);
-                int index = items.Count - 1;
-                data[category][item.Title].Enqueue(index);
+                // create a shallow clone with new ID (ID here used as the global index)
+                Item copy;
+                int newId = items.Count;
+
+                if (item is Book b)
+                    copy = new Book(newId, b.Title, b.Price, b.Author);
+                else if (item is Magazine m)
+                    copy = new Magazine(newId, m.Title, m.Price, m.PublishDate);
+                else if (item is DVD d)
+                    copy = new DVD(newId, d.Title, d.Price, d.Duration);
+                else
+                    throw new InvalidOperationException("Unknown item type");
+
+                copy.InventoryIndex = newId;
+                items.Add(copy);
+                catalog[category][item.Title].Add(newId);
             }
         }
 
-        public Item BorrowItem(string category, string title)
-        {
-            if (!data.ContainsKey(category) || !data[category].ContainsKey(title))
-                throw new InvalidCategoryException("Invalid category or title");
+        public IEnumerable<string> GetCategories() => catalog.Keys;
 
-            var queue = data[category][title];
-            if (queue.Count == 0)
-                throw new BorrowedItemException($"{title} is not available");
-
-            foreach (var idx in queue)
-            {
-                var item = items[idx];
-                if (item.State == ItemState.Available)
-                {
-                    item.State = ItemState.Borrowed;
-                    return item;
-                }
-            }
-
-            // If all items are borrowed/sold
-            throw new BorrowedItemException($"{title} has no available copies to borrow will be added soon");
-        }
-
-
-        public Item SellItem(string category, string title)
-        {
-            if (!data.ContainsKey(category) || !data[category].ContainsKey(title))
-                throw new InvalidCategoryException("Invalid category or title");
-
-            var queue = data[category][title];
-            if (queue.Count == 0)
-                throw new SoldItemException($"{title} is out of stock");
-
-            int idx = queue.Dequeue();
-            var item = items[idx];
-
-            if (item.State != ItemState.Available)
-                throw new SoldItemException($"{title} cannot be sold (already borrowed/sold)");
-
-            item.State = ItemState.Sold;
-            return item;
-        }
-
-
-        public void ReturnItem(string category, string title, Item item)
-        {
-            if (!data.ContainsKey(category) || !data[category].ContainsKey(title))
-                throw new InvalidCategoryException("Invalid category or title");
-
-            if (item.State != ItemState.Borrowed)
-                throw new InvalidOperationException("Item was not borrowed");
-
-            item.State = ItemState.Available;
-        }
-
-        public bool IsEmpty()
-        {
-            return items.Count == 0;
-        }
-        public IEnumerable<string> GetCategories()
-        {
-            return data.Keys;
-        }
+        // return all copies for a category
         public IEnumerable<Item> GetAllItems(string category)
         {
-            if (!data.ContainsKey(category))
-                throw new InvalidCategoryException("Invalid category");
+            if (!catalog.ContainsKey(category))
+                yield break;
 
-            foreach (var title in data[category].Keys)
+            foreach (var title in catalog[category].Keys)
             {
-                foreach (var index in data[category][title])
+                foreach (var idx in catalog[category][title])
                 {
-                    yield return items[index];
+                    yield return items[idx];
                 }
             }
         }
+
+        // return copies for a specific title
+        public IEnumerable<Item> GetCopies(string category, string title)
+        {
+            if (!catalog.ContainsKey(category))
+                yield break;
+            if (!catalog[category].ContainsKey(title))
+                yield break;
+
+            foreach (var idx in catalog[category][title])
+                yield return items[idx];
+        }
+
+        public Item GetItemById(int itemId)
+        {
+            if (itemId < 0 || itemId >= items.Count)
+                throw new InvalidIdException("Item ID does not exist");
+            return items[itemId];
+        }
+
+        // borrow first available copy
+        public Item BorrowItem(string category, string title)
+        {
+            if (!catalog.ContainsKey(category) || !catalog[category].ContainsKey(title))
+                throw new InvalidCategoryException("Invalid category or title");
+
+            var list = catalog[category][title];
+            if (list.Count == 0)
+                throw new BorrowedItemException($"{title} is not available");
+
+            foreach (var idx in list)
+            {
+                var it = items[idx];
+                if (it.State == ItemState.Available)
+                {
+                    it.State = ItemState.Borrowed;
+                    return it;
+                }
+            }
+
+            throw new BorrowedItemException($"{title} has no available copies to borrow");
+        }
+
+        // borrow a specific copy by itemId (frontend can pass item ID)
+        public Item BorrowItem(string category, int itemId)
+        {
+            var it = GetItemById(itemId);
+            if (!catalog.ContainsKey(category) || !catalog[category].ContainsKey(it.Title))
+                throw new InvalidCategoryException("Invalid category or title");
+
+            if (it.State != ItemState.Available)
+                throw new BorrowedItemException("This copy is not available for borrowing");
+
+            it.State = ItemState.Borrowed;
+            return it;
+        }
+
+        // sell a specific copy (remove it from catalog list but keep object for history)
+        public Item SellItem(string category, int itemId)
+        {
+            var it = GetItemById(itemId);
+            if (!catalog.ContainsKey(category) || !catalog[category].ContainsKey(it.Title))
+                throw new InvalidCategoryException("Invalid category or title");
+
+            if (it.State != ItemState.Available)
+                throw new SoldItemException("This copy cannot be sold (not available)");
+
+            it.State = ItemState.Sold;
+
+            var list = catalog[category][it.Title];
+            // remove the id from the title list; O(n) in copies count (fine for small project)
+            bool removed = list.Remove(itemId);
+
+            // if you want to keep catalog clean, you could remove title if list empty - optional
+            if (removed && list.Count == 0)
+                catalog[category].Remove(it.Title);
+
+            return it;
+        }
+
+        // return a borrowed-specific copy
+        public void ReturnItem(string category, int itemId)
+        {
+            var it = GetItemById(itemId);
+            if (it.State != ItemState.Borrowed)
+                throw new InvalidOperationException("Item was not borrowed");
+
+            it.State = ItemState.Available;
+
+            if (!catalog.ContainsKey(category))
+                throw new InvalidCategoryException("Invalid category");
+
+            if (!catalog[category].ContainsKey(it.Title))
+                catalog[category][it.Title] = new List<int>();
+
+            var list = catalog[category][it.Title];
+            if (!list.Contains(itemId))
+                list.Add(itemId);
+        }
+
+        // add more copies based on an existing item (restock)
+        public int RestockItem(string category, int itemId, int additionalQuantity)
+        {
+            if (additionalQuantity <= 0)
+                throw new ArgumentException("additionalQuantity must be > 0");
+
+            var existing = GetItemById(itemId);
+            if (existing == null)
+                throw new InvalidIdException("Item id not found");
+
+            if (!catalog.ContainsKey(category))
+                catalog[category] = new Dictionary<string, List<int>>(StringComparer.OrdinalIgnoreCase);
+            if (!catalog[category].ContainsKey(existing.Title))
+                catalog[category][existing.Title] = new List<int>();
+
+            for (int i = 0; i < additionalQuantity; i++)
+            {
+                int newId = items.Count;
+                Item copy;
+                if (existing is Book b)
+                    copy = new Book(newId, b.Title, b.Price, b.Author);
+                else if (existing is Magazine m)
+                    copy = new Magazine(newId, m.Title, m.Price, m.PublishDate);
+                else if (existing is DVD d)
+                    copy = new DVD(newId, d.Title, d.Price, d.Duration);
+                else
+                    throw new InvalidOperationException("Unknown item type");
+
+                copy.InventoryIndex = newId;
+                items.Add(copy);
+                catalog[category][existing.Title].Add(newId);
+            }
+
+            return additionalQuantity;
+        }
+
+        public bool IsEmpty() => items.Count == 0;
     }
 
-
-
-
-
+    // ---------------------- FINANCE ----------------------
     public class LibraryFinance
     {
         private Decimal _BorrowingCurrent;
         private Decimal _sellingCurrent;
-
 
         public LibraryFinance()
         {
             this._BorrowingCurrent = this._sellingCurrent = 0;
         }
 
-        public Decimal BorrowingCurrent
-        {
-            get => _BorrowingCurrent;
-
-        }
-
-        public Decimal SellingCurrent
-        {
-            get => _sellingCurrent;
-        }
+        public Decimal BorrowingCurrent => _BorrowingCurrent;
+        public Decimal SellingCurrent => _sellingCurrent;
 
         public void FinancialBorrowingTransaction(Decimal charge)
         {
-
-
-
             this._BorrowingCurrent += charge * 0.1m;
         }
 
         public void FinancialSellingTransaction(decimal charge)
         {
-
             this._sellingCurrent += charge;
         }
-
-
-
-
     }
 
+    // ---------------------- REPORTING ----------------------
     public class LibraryReportData
     {
         public List<CategoryReportData> Categories { get; set; } = new List<CategoryReportData>();
@@ -392,16 +472,13 @@ namespace PROGRAM
         public void GetExtraDetails(Item i)
         {
             if (i is Book book)
-                ExtraDetails = book.Author;
-
-            if (i is Magazine m)
-                ExtraDetails = m.PublishDate.ToString();
-            if (i is DVD d)
-                ExtraDetails = d.Duration.ToString();
-
+                ExtraDetails = $"Author: {book.Author}";
+            else if (i is Magazine m)
+                ExtraDetails = $"Publish Date: {m.PublishDate}";
+            else if (i is DVD d)
+                ExtraDetails = $"Duration: {d.Duration} hours";
         }
     }
-
 
     public class LibraryReportBuilder
     {
@@ -420,6 +497,7 @@ namespace PROGRAM
                 BorrowingRevenue = finance.BorrowingCurrent,
                 SellingRevenue = finance.SellingCurrent
             };
+
             foreach (var category in inventory.GetCategories())
             {
                 var categoryData = new CategoryReportData { Category = category };
@@ -437,10 +515,10 @@ namespace PROGRAM
                 }
                 reportData.Categories.Add(categoryData);
             }
+
             return reportData;
         }
     }
-
 
     public class LibraryReporting
     {
@@ -497,7 +575,7 @@ namespace PROGRAM
         }
     }
 
-
+    // ---------------------- OPERATIONS / HISTORY ----------------------
     public enum OperationType
     {
         Borrow,
@@ -505,9 +583,6 @@ namespace PROGRAM
         Return,
         Restock
     }
-
-
-
 
     public class LibraryOperationRecord
     {
@@ -531,7 +606,6 @@ namespace PROGRAM
         }
     }
 
-
     public class LibraryOperationHistory
     {
         private List<LibraryOperationRecord> records;
@@ -552,15 +626,39 @@ namespace PROGRAM
         }
     }
 
-
-
-
-
+    // ---------------- INTERFACES & REQUESTS ----------------
     public interface ITransaction
     {
-        public void Execute(string category, string itemTitle, int userId, int itemId, decimal charge, int berid);
+        void Execute(TransactionRequest request);
     }
 
+    public abstract class TransactionRequest
+    {
+        public string Category { get; set; }
+        public string ItemTitle { get; set; }
+    }
+
+    public class BorrowRequest : TransactionRequest
+    {
+        public int UserId { get; set; }
+        public int ItemId { get; set; }   // optional: if user picked a copy (set -1 if not)
+        public decimal Charge { get; set; }
+        public int Period { get; set; }
+    }
+
+    public class SellRequest : TransactionRequest
+    {
+        public int UserId { get; set; }
+        public int ItemId { get; set; }
+        public decimal Charge { get; set; }
+    }
+
+    public class ReturnRequest : TransactionRequest
+    {
+        public int ItemId { get; set; }
+    }
+
+    // ---------------- TRANSACTIONS ----------------
     public class BorrowingTransaction : ITransaction
     {
         private readonly LibraryFinance finance;
@@ -574,23 +672,33 @@ namespace PROGRAM
             this.inventory = inv;
         }
 
-        public void Execute(string category, string itemTitle, int userId, int itemId, decimal charge, int berid)
+        public void Execute(TransactionRequest request)
         {
-            LibraryOperationRecord libraryOperationRecord = new LibraryOperationRecord(itemId, userId, OperationType.Borrow, DateTime.Now, berid);
+            var req = (BorrowRequest)request;
+            LibraryOperationRecord record = new LibraryOperationRecord(
+                req.ItemId, req.UserId, OperationType.Borrow, DateTime.Now, req.Period);
+
             try
             {
-                Item i = this.inventory.BorrowItem(category, itemTitle);
+                Item i;
+                // If ItemId provided -> borrow that copy; otherwise borrow first available
+                if (req.ItemId >= 0)
+                    i = this.inventory.BorrowItem(req.Category, req.ItemId);
+                else
+                    i = this.inventory.BorrowItem(req.Category, req.ItemTitle);
 
                 try
                 {
-                    this.finance.FinancialBorrowingTransaction(charge);
-                    this.history.AddRecord(libraryOperationRecord);
+                    this.finance.FinancialBorrowingTransaction(req.Charge);
+                    this.history.AddRecord(record);
                     Console.WriteLine("Borrowing transaction completed successfully");
                 }
                 catch (Exception err)
                 {
-                    this.inventory.ReturnItem(category, itemTitle, i);
+                    // rollback inventory state if finance fails (we changed item state to borrowed above)
+                    this.inventory.ReturnItem(req.Category, i.ID);
                     Console.WriteLine(err);
+                    throw;
                 }
             }
             catch (Exception err)
@@ -598,14 +706,8 @@ namespace PROGRAM
                 Console.WriteLine(err);
                 throw;
             }
-
         }
-
-
-
-
     }
-
 
     public class SellingTransaction : ITransaction
     {
@@ -620,70 +722,78 @@ namespace PROGRAM
             this.inventory = inv;
         }
 
-        public void Execute(string category, string itemTitle, int userId, int itemId, decimal charge, int berid)
+        public void Execute(TransactionRequest request)
         {
+            var req = (SellRequest)request;
+
             try
             {
-                Item i = inventory.SellItem(category, itemTitle);
+                Item i;
+                if (req.ItemId >= 0)
+                    i = inventory.SellItem(req.Category, req.ItemId);
+                else
+                    throw new InvalidOperationException("Selling requires a specific item id");
+
                 try
                 {
-                    finance.FinancialSellingTransaction(charge);
-                    LibraryOperationRecord libraryOperationRecord = new LibraryOperationRecord(itemId, userId, OperationType.Sell, DateTime.Now, berid);
-                    history.AddRecord(libraryOperationRecord);
+                    finance.FinancialSellingTransaction(req.Charge);
+                    LibraryOperationRecord record = new LibraryOperationRecord(
+                        req.ItemId, req.UserId, OperationType.Sell, DateTime.Now, 0);
+                    history.AddRecord(record);
                     Console.WriteLine("Item Sold Successfully");
                 }
                 catch (Exception err)
                 {
-                    inventory.ReturnItem(category, itemTitle, i);
                     Console.WriteLine(err);
+                    throw;
                 }
             }
             catch (Exception err)
             {
                 Console.WriteLine(err);
+                throw;
             }
-
         }
-
-}
+    }
 
     public class ReturnTransaction : ITransaction
     {
-
-        private readonly LibraryFinance finance;
         private readonly LibraryInventory inventory;
         private readonly LibraryOperationHistory history;
 
-        public ReturnTransaction(LibraryFinance f, LibraryInventory inv, LibraryOperationHistory his)
+        public ReturnTransaction(LibraryInventory inv, LibraryOperationHistory his)
         {
-            this.finance = f;
             this.history = his;
             this.inventory = inv;
         }
 
-
-        public void Execute(string category, string itemTitle, int userId, int itemId, decimal charge, int berid)
+        public void Execute(TransactionRequest request)
         {
-    
-}
+            var req = (ReturnRequest)request;
+            try
+            {
+                this.inventory.ReturnItem(req.Category, req.ItemId);
+                LibraryOperationRecord record = new LibraryOperationRecord(
+                    req.ItemId, 0, OperationType.Return, DateTime.Now, 0);
+                history.AddRecord(record);
+                Console.WriteLine("Item returned successfully");
+            }
+            catch (Exception err)
+            {
+                Console.WriteLine(err);
+                throw;
+            }
+        }
+    }
 
-
-
-
-}
-
-
+    // ---------------- LIBRARY ----------------
     public class Library
     {
-
-
-
         private LibraryFinance finance;
         private LibraryInventory inventory;
         private LibraryReporting report;
         private LibraryOperationHistory history;
         private Dictionary<OperationType, ITransaction> Transactions;
-
 
         public Library()
         {
@@ -691,31 +801,38 @@ namespace PROGRAM
             finance = new LibraryFinance();
             report = new LibraryReporting(finance, inventory);
             history = new LibraryOperationHistory();
+
             Transactions = new Dictionary<OperationType, ITransaction>
             {
-                {OperationType.Borrow,new BorrowingTransaction(finance,inventory,history)},
-                {OperationType.Sell,new SellingTransaction(finance,inventory,history)}
+                { OperationType.Borrow, new BorrowingTransaction(finance, inventory, history) },
+                { OperationType.Sell, new SellingTransaction(finance, inventory, history) },
+                { OperationType.Return, new ReturnTransaction(inventory, history) }
             };
         }
 
-
-        public void AddNewItem(string key, Item i, int quantity)
+        public void AddNewItem(string category, Item i, int quantity)
         {
-            this.inventory.AddNewItem(key, i, quantity);
+            this.inventory.AddNewItem(category, i, quantity);
             Console.WriteLine($"Item added successfully");
-
         }
 
-        public void ExecTransation(OperationType operationType, string category, string itemTitle, int userId, int itemId, decimal charge, int berid,Item item)
+        public void ExecTransaction(OperationType operationType, TransactionRequest request)
         {
-            if (operationType is OperationType ot)
-
-                Transactions[operationType].Execute(category, itemTitle, userId, itemId, charge, berid,item);
-
+            if (Transactions.ContainsKey(operationType))
+                Transactions[operationType].Execute(request);
             else
-                Console.WriteLine("unsupported operation");
+                Console.WriteLine("Unsupported operation");
+        }
 
+        // convenience wrappers (keeps your older usage patterns)
+        public void BorrowItem(string category, int itemId)
+        {
+            this.inventory.BorrowItem(category, itemId);
+        }
 
+        public void SellItem(string category, int itemId)
+        {
+            this.inventory.SellItem(category, itemId);
         }
 
         public void ReturnItem(string category, int itemId)
@@ -728,6 +845,7 @@ namespace PROGRAM
             catch (Exception err)
             {
                 Console.WriteLine(err);
+                throw;
             }
         }
 
@@ -736,7 +854,7 @@ namespace PROGRAM
             this.inventory.RestockItem(category, itemId, quantity);
         }
 
-
+        // I kept your typo method names so it feels like you :)
         public void DesplayLibraryStatus()
         {
             this.report.DisplayLibraryStatus();
@@ -749,31 +867,26 @@ namespace PROGRAM
 
         public void GetItemQuantity(string category, int itemId)
         {
-            var libitem = this.inventory.GetItem(category, itemId);
-            Console.WriteLine($"Item '{libitem.Item.Title}' (ID: {itemId}) has quantity: {libitem.Quantity}");
+            var itm = this.inventory.GetItemById(itemId);
+            Console.WriteLine($"Item '{itm.Title}' (ID: {itemId}) has state: {itm.State}");
         }
-
-
-
     }
 
-
-
-
+    // ---------------- CUSTOMER & TRANSACTION SERVICE ----------------
     public enum CustomerItemState
     {
         Bought,
         Borrowed,
     }
 
-        public class CustomerItem
-        {
-            public Item item { get; set; }
-            public CustomerItemState customerItemState { get; set; }
-        }
+    public class CustomerItem
+    {
+        public Item item { get; set; }
+        public CustomerItemState customerItemState { get; set; }
+    }
+
     public class Customer : User
     {
-
         private List<CustomerItem> CustomerItems;
 
         public Customer(string name, string phone, Decimal balance) : base(name, phone, balance)
@@ -814,6 +927,7 @@ namespace PROGRAM
 
     public class TransactionService
     {
+        // kept your approach, and adapted to new signatures (library sells by id)
         public bool CustomerBuyItem(Library library, Customer customer, string category, Item item)
         {
             bool balanceDecreased = false;
@@ -822,6 +936,7 @@ namespace PROGRAM
                 customer.DecreaseBalance(item.Price);
                 balanceDecreased = true;
 
+                // library.SellItem expects category + itemId now
                 library.SellItem(category, item.ID);
 
                 customer.BuyItem(item);
@@ -856,6 +971,7 @@ namespace PROGRAM
                 customer.DecreaseBalance(borrowingFee);
                 balanceDecreased = true;
 
+                // library.BorrowItem now uses category + itemId
                 library.BorrowItem(category, item.ID);
 
                 customer.BorrowItem(item);
@@ -895,18 +1011,4 @@ namespace PROGRAM
             }
         }
     }
-
-
 }
-
-
-
-
-
-
-
-
-
-
-
-
