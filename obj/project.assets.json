@@ -13,11 +13,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "/home/ziad/git/Program/Program.csproj",
+      "projectUniqueName": "/home/ziad/git/Project/Program.csproj",
       "projectName": "Program",
-      "projectPath": "/home/ziad/git/Program/Program.csproj",
+      "projectPath": "/home/ziad/git/Project/Program.csproj",
       "packagesPath": "/home/ziad/.nuget/packages/",
-      "outputPath": "/home/ziad/git/Program/obj/",
+      "outputPath": "/home/ziad/git/Project/obj/",
       "projectStyle": "PackageReference",
       "configFilePaths": [
         "/home/ziad/.nuget/NuGet/NuGet.Config"

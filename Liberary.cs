@@ -1,68 +1,33 @@
-using System.Reflection;
-using System.Reflection.Metadata.Ecma335;
-using System.Text.RegularExpressions;
-
 namespace PROGRAM
 {
     using System;
     using System.Collections.Generic;
-    using System.Data.Common;
+    using System.Diagnostics.Metrics;
     using System.Linq;
-    using System.Runtime.CompilerServices;
+    using System.Reflection.Emit;
+    using System.Security.Cryptography;
+    using System.Security.Principal;
+    using System.Text.RegularExpressions;
 
-    public class BorrowedItemException : Exception
-    {
-        public BorrowedItemException(string msg) : base(msg) { }
-    }
+    // ---------------------- EXCEPTIONS ----------------------
+    public class BorrowedItemException : Exception { public BorrowedItemException(string msg) : base(msg) { } }
+    public class InvalidCategoryException : Exception { public InvalidCategoryException(string str) : base(str) { } }
+    public class InvalidDurationException : Exception { public InvalidDurationException(string str) : base(str) { } }
+    public class InvalidIdException : Exception { public InvalidIdException(string msg) : base(msg) { } }
+    public class InvalidPhoneException : Exception { public InvalidPhoneException(string msg) : base(msg) { } }
+    public class InvalidBalanceValueException : Exception { public InvalidBalanceValueException(string msg) : base(msg) { } }
+    public class InvalidPriceException : Exception { public InvalidPriceException(string msg) : base(msg) { } }
+    public class SoldItemException : Exception { public SoldItemException(string msg) : base(msg) { } }
 
-
-
-
-
-
-    public class InvalidCategoryException : Exception
-    {
-        public InvalidCategoryException(string str) : base(str) { }
-    }
-
-    public class InvlaidDurationException : Exception
-    {
-        public InvlaidDurationException(string str) : base(str) { }
-    }
-
-    public class InvalidIdException : Exception
-    {
-        public InvalidIdException(string msg) : base(msg) { }
-    }
-    public class InvalidPhoneException : Exception
-    {
-        public InvalidPhoneException(string msg) : base(msg) { }
-    }
-
-    public class InvalidBalanceValueException : Exception
-    {
-        public InvalidBalanceValueException(string msg) : base(msg) { }
-
-    }
-
-    public class InvalidPriceException : Exception
-    {
-        public InvalidPriceException(string msg) : base(msg) { }
-    }
-public class SoldItemException : Exception
-    {
-        public SoldItemException(string msg) : base(msg) { }
-    }
-
-
+    // ---------------------- ENUMS ----------------------
     public enum ItemState
     {
-        Avelable,
+        Available,
         Borrowed,
         Sold,
     }
 
-
+    // ---------------------- USER ----------------------
     public abstract class User
     {
         protected string _name;
@@ -75,100 +40,61 @@ public class SoldItemException : Exception
             set
             {
                 if (string.IsNullOrWhiteSpace(value))
-                {
                     throw new ArgumentException("Name cannot be empty or whitespace.");
-                }
                 if (value.All(char.IsDigit))
-                {
                     throw new ArgumentException("Name cannot be digits.");
-                }
                 _name = value.Trim().ToUpper();
             }
         }
-       public string Phone
-{
-    get => _phone;
-    set
-    {
-        string cleanedValue = Regex.Replace(value, @"[^\d]", "");
 
-        if (!cleanedValue.All(char.IsDigit))
+        public string Phone
         {
-            throw new InvalidPhoneException("Input has non-digit characters.");
-        }
-
-        if (cleanedValue.Length != 11)
-        {
-            throw new InvalidPhoneException("Phone number must be 11 digits.");
-        }
-
-        if (!cleanedValue.StartsWith("01"))
-        {
-            throw new InvalidPhoneException("Phone number must start with 01.");
-        }
-
-        int counterOfRepeatedDigits = 1;
-        for (int i = 1; i < cleanedValue.Length; i++)
-        {
-            if (cleanedValue[i] == cleanedValue[i - 1])
+            get => _phone;
+            set
             {
-                counterOfRepeatedDigits++;
-                if (counterOfRepeatedDigits > 3)
+                string cleanedValue = Regex.Replace(value, @"[^\d]", "");
+
+                if (!cleanedValue.All(char.IsDigit))
+                    throw new InvalidPhoneException("Input has non-digit characters.");
+                if (cleanedValue.Length != 11)
+                    throw new InvalidPhoneException("Phone number must be 11 digits.");
+                if (!cleanedValue.StartsWith("01"))
+                    throw new InvalidPhoneException("Phone number must start with 01.");
+
+                int counter = 1;
+                for (int i = 1; i < cleanedValue.Length; i++)
                 {
-                    throw new InvalidPhoneException("Phone number has more than 3 repeated digits.");
+                    if (cleanedValue[i] == cleanedValue[i - 1])
+                    {
+                        counter++;
+                        if (counter > 3)
+                            throw new InvalidPhoneException("Phone number has more than 3 repeated digits.");
+                    }
+                    else counter = 1;
                 }
-            }
-            else
-            {
-                counterOfRepeatedDigits = 1;
+
+                _phone = cleanedValue;
             }
         }
 
-        _phone = cleanedValue;
-    }
-}
-
-
-        public Decimal Balance
+        public decimal Balance
         {
             get => _balance;
             set
             {
-
                 if (value < 0)
-                {
-                    throw new InvalidBalanceValueException("invalid balance cant be nigative");
-
-                }
-
+                    throw new InvalidBalanceValueException("Invalid balance, cannot be negative");
                 _balance = value;
-
-
             }
         }
 
-
-
-        public User(string name, string phone, Decimal balance)
+        public User(string name, string phone, decimal balance)
         {
-
             Name = name;
             Phone = phone;
             Balance = balance;
-
         }
-
-
-
-
-
     }
-
-
-
-
-
-
 
     // ---------------------- ITEM ----------------------
     public abstract class Item
@@ -176,21 +102,25 @@ public class SoldItemException : Exception
         protected int _id;
         protected string _title;
         protected decimal _price;
-        protected decimal _itemState;
+        protected ItemState _state;
 
-        public decimal ItemState{ get; set; }
+        // New: track inventory index for quick return
+        public int InventoryIndex { get; set; }
 
-
-
+        public ItemState State
+        {
+            get => _state;
+            set => _state = value;
+        }
 
         protected Item(int id, string title, decimal price)
         {
             if (id < 0 || id > 10000)
-                throw new InvalidIdException("not valid id");
+                throw new InvalidIdException("Not valid ID");
 
             _id = id;
+            _state = ItemState.Available;
             _title = title.ToUpper();
-            _itemState = ItemState.Avelable;
             _price = price >= 0 ? price : throw new InvalidPriceException("Price must be >= 0");
         }
 
@@ -200,9 +130,7 @@ public class SoldItemException : Exception
             set
             {
                 if (value < 0 || value > 10000)
-                {
-                    throw new InvalidIdException("not valid id");
-                }
+                    throw new InvalidIdException("Not valid ID");
                 _id = value;
             }
         }
@@ -219,14 +147,10 @@ public class SoldItemException : Exception
             set
             {
                 if (value < 0)
-                {
-                    throw new InvalidPriceException("your input is not a valid price");
-                }
+                    throw new InvalidPriceException("Invalid price, must be >= 0");
                 _price = value;
-
             }
         }
-
 
         public abstract void DisplayInfo();
     }
@@ -234,22 +158,22 @@ public class SoldItemException : Exception
     // ---------------------- BOOK ----------------------
     public class Book : Item
     {
-        private string _auther;
-        public Book(int id, string title, decimal price, string auther)
+        private string _author;
+        public Book(int id, string title, decimal price, string author)
             : base(id, title, price)
         {
-            _auther = auther.ToUpper();
+            _author = author.ToUpper();
         }
 
-        public string Auther
+        public string Author
         {
-            get => _auther;
-            set => _auther = value.ToUpper();
+            get => _author;
+            set => _author = value.ToUpper();
         }
 
         public override void DisplayInfo()
         {
-            Console.WriteLine("Book id is " + _id + " and Book name is " + _title + " and book auther is " + _auther + " and its price is " + _price);
+            Console.WriteLine($"Book ID: {_id}, Title: {_title}, Author: {_author}, Price: {_price}");
         }
     }
 
@@ -263,16 +187,13 @@ public class SoldItemException : Exception
             : base(id, title, price)
         {
             if (date < 1000 || date > 2026)
-            {
-                throw new InvalidDataException("the date you enter is ether too old or in the fuecher");
-            }
+                throw new InvalidDataException("The date you entered is invalid.");
             _pubDate = date;
         }
 
-
         public override void DisplayInfo()
         {
-            Console.WriteLine("magazine id is " + _id + " and magazine name is " + _title + " and publish date is " + _pubDate + " and its price is " + _price);
+            Console.WriteLine($"Magazine ID: {_id}, Title: {_title}, Publish Date: {_pubDate}, Price: {_price}");
         }
     }
 
@@ -285,240 +206,121 @@ public class SoldItemException : Exception
             : base(id, title, price)
         {
             if (duration < 0 || duration > 10)
-            {
-                throw new InvlaidDurationException("the duration is invalid");
-            }
+                throw new InvalidDurationException("The duration is invalid");
             _duration = duration;
         }
 
         public double Duration => _duration;
 
-
         public override void DisplayInfo()
         {
-            Console.WriteLine($"DVD id is {_id}, title is {_title}, duration is {_duration} hours, and its price is {_price}");
+            Console.WriteLine($"DVD ID: {_id}, Title: {_title}, Duration: {_duration} hours, Price: {_price}");
         }
     }
 
-    public class LibraryEntry
-    {
-        public Item Item { get; set; }
-        public int Quantity { get; set; }
-        public ItemState State { get; set; } = ItemState.Avelable;
-
-    }
-    // ---------------------- LIBRARY ----------------------
-
-
     public class LibraryInventory
     {
+        private List<Item> items;
+        public Dictionary<string, Dictionary<string, Queue<int>>> data;
 
-        public Dictionary<string, Dictionary<int, LibraryEntry>> data;
+        public LibraryInventory()
+        {
+            items = new List<Item>();
+            data = new Dictionary<string, Dictionary<string, Queue<int>>>();
+        }
 
+        public void AddNewItem(string category, Item item, int quantity)
+        {
+            if (!data.ContainsKey(category))
+                data[category] = new Dictionary<string, Queue<int>>();
+
+            if (!data[category].ContainsKey(item.Title))
+                data[category][item.Title] = new Queue<int>();
+
+            for (int i = 0; i < quantity; i++)
+            {
+                items.Add(item);
+                int index = items.Count - 1;
+                data[category][item.Title].Enqueue(index);
+            }
+        }
+
+        public Item BorrowItem(string category, string title)
+        {
+            if (!data.ContainsKey(category) || !data[category].ContainsKey(title))
+                throw new InvalidCategoryException("Invalid category or title");
+
+            var queue = data[category][title];
+            if (queue.Count == 0)
+                throw new BorrowedItemException($"{title} is not available");
+
+            foreach (var idx in queue)
+            {
+                var item = items[idx];
+                if (item.State == ItemState.Available)
+                {
+                    item.State = ItemState.Borrowed;
+                    return item;
+                }
+            }
+
+            // If all items are borrowed/sold
+            throw new BorrowedItemException($"{title} has no available copies to borrow will be added soon");
+        }
+
+
+        public Item SellItem(string category, string title)
+        {
+            if (!data.ContainsKey(category) || !data[category].ContainsKey(title))
+                throw new InvalidCategoryException("Invalid category or title");
+
+            var queue = data[category][title];
+            if (queue.Count == 0)
+                throw new SoldItemException($"{title} is out of stock");
+
+            int idx = queue.Dequeue();
+            var item = items[idx];
+
+            if (item.State != ItemState.Available)
+                throw new SoldItemException($"{title} cannot be sold (already borrowed/sold)");
+
+            item.State = ItemState.Sold;
+            return item;
+        }
+
+
+        public void ReturnItem(string category, string title, Item item)
+        {
+            if (!data.ContainsKey(category) || !data[category].ContainsKey(title))
+                throw new InvalidCategoryException("Invalid category or title");
+
+            if (item.State != ItemState.Borrowed)
+                throw new InvalidOperationException("Item was not borrowed");
+
+            item.State = ItemState.Available;
+        }
+
+        public bool IsEmpty()
+        {
+            return items.Count == 0;
+        }
         public IEnumerable<string> GetCategories()
         {
             return data.Keys;
         }
-
-        public IEnumerable<LibraryEntry> GetItemsInCategory(string category)
+        public IEnumerable<Item> GetAllItems(string category)
         {
             if (!data.ContainsKey(category))
-                return new List<LibraryEntry>();
-
-            return data[category].Values;
-        }
-
-
-
-        public bool IsEmpty()
-        {
-            return this.data.Count == 0;
-        }
-
-
-        public LibraryEntry GetItem(string category, int itemId)
-        {
-            if (!this.data.ContainsKey(category))
-            {
                 throw new InvalidCategoryException("Invalid category");
-            }
 
-            if (!this.data[category].ContainsKey(itemId))
+            foreach (var title in data[category].Keys)
             {
-                throw new InvalidIdException($"The item with ID {itemId} is not in the library");
-            }
-
-            return this.data[category][itemId];
-        }
-        public LibraryInventory()
-        {
-            data = new Dictionary<string, Dictionary<int, LibraryEntry>>();
-
-        }
-
-        public void AddNewItem(string key, Item i, int quantity)
-        {
-            if (!this.data.ContainsKey(key))
-            {
-                this.data[key] = new Dictionary<int, LibraryEntry>();
-            }
-
-            if (!this.data[key].ContainsKey(i.ID))
-            {
-                this.data[key][i.ID] = new LibraryEntry { Item = i, Quantity = quantity };
-            }
-            else
-            {
-                this.data[key][i.ID].Quantity += quantity;
-                if (this.data[key][i.ID].Quantity > 0 && this.data[key][i.ID].State != ItemState.Avelable)
+                foreach (var index in data[category][title])
                 {
-                    this.data[key][i.ID].State = ItemState.Avelable;
-
-                }
-            }
-
-
-        }
-
-
-
-        public bool BorrowItem(string category, int itemId)
-        {
-            if (!this.data.ContainsKey(category))
-            {
-                throw new InvalidCategoryException("Invalid category");
-            }
-
-            if (!this.data[category].ContainsKey(itemId))
-            {
-                throw new InvalidIdException($"The item with ID {itemId} is not in the library");
-            }
-
-            LibraryEntry libraryItem = this.data[category][itemId];
-
-            if (libraryItem.Quantity == 0)
-            {
-                if (libraryItem.State == ItemState.Borrowed)
-                {
-                    throw new BorrowedItemException("sorry the item borrowed and will be avelable soon");
-                }
-                else if (libraryItem.State == ItemState.Sold)
-                {
-                    throw new SoldItemException("item sold out");
-                }
-            }
-
-            if (libraryItem.Quantity > 0)
-            {
-                libraryItem.Quantity -= 1;
-
-                if (libraryItem.Quantity == 0)
-                {
-                    libraryItem.State = ItemState.Borrowed;
-                }
-
-            }
-            return true;
-
-        }
-
-
-
-
-
-        public void SellItem(string category, int itemId)
-        {
-            if (!this.data.ContainsKey(category))
-            {
-                throw new InvalidCategoryException("category dose not exsist");
-            }
-
-            if (!this.data[category].ContainsKey(itemId))
-            {
-                throw new InvalidIdException("item id dose not esist");
-            }
-
-            LibraryEntry libraryItem = this.data[category][itemId];
-
-            if (libraryItem.Quantity == 0)
-            {
-                if (libraryItem.State == ItemState.Borrowed)
-                {
-                    throw new BorrowedItemException("Item borrowed and will return soon");
-                }
-                else if (libraryItem.State == ItemState.Sold)
-                {
-                    throw new SoldItemException("Item sold out");
-                }
-            }
-
-            if (libraryItem.Quantity > 0)
-            {
-                libraryItem.Quantity -= 1;
-
-                if (libraryItem.Quantity == 0)
-                {
-                    libraryItem.State = ItemState.Sold;
-                }
-
-            }
-
-
-        }
-
-        public void ReturnItem(string category, int itemId)
-        {
-            if (!this.data.ContainsKey(category))
-            {
-                throw new InvalidCategoryException("category dose not exsist");
-            }
-            if (!this.data[category].ContainsKey(itemId))
-            {
-                throw new InvalidIdException("invalid id");
-            }
-
-            LibraryEntry libraryItem = this.data[category][itemId];
-
-            if (libraryItem.State == ItemState.Sold)
-            {
-                throw new SoldItemException($"item {itemId} is sold and cant be returned");
-            }
-            if (libraryItem.State == ItemState.Borrowed)
-            {
-                libraryItem.State = ItemState.Avelable;
-
-            }
-
-            libraryItem.Quantity += 1;
-            
-
-        }
-
-        public void RestockItem(string category, int itemId, int additionalQuantity)
-        {
-            if (!this.data.ContainsKey(category))
-            {
-                throw new InvalidCategoryException("category dose not exsist");
-            }
-            if (!this.data[category].ContainsKey(itemId))
-            {
-                throw new InvalidIdException("invalid id");
-            }
-            else
-            {
-                LibraryEntry libraryItem = this.data[category][itemId];
-                libraryItem.Quantity += additionalQuantity;
-                if (libraryItem.State != ItemState.Avelable)
-                {
-                    libraryItem.State = ItemState.Avelable;
+                    yield return items[index];
                 }
             }
         }
-
-
-
-
-
     }
 
 
@@ -566,98 +368,309 @@ public class SoldItemException : Exception
 
     }
 
+    public class LibraryReportData
+    {
+        public List<CategoryReportData> Categories { get; set; } = new List<CategoryReportData>();
+        public decimal BorrowingRevenue { get; set; }
+        public decimal SellingRevenue { get; set; }
+        public decimal TotalRevenue => BorrowingRevenue + SellingRevenue;
+    }
+
+    public class CategoryReportData
+    {
+        public string Category { get; set; }
+        public List<ItemReportData> Items { get; set; } = new List<ItemReportData>();
+    }
+
+    public class ItemReportData
+    {
+        public int Id { get; set; }
+        public string Title { get; set; }
+        public decimal Price { get; set; }
+        public ItemState State { get; set; }
+        public string ExtraDetails { get; set; } // Author, Publish Date, Duration, etc.
+        public void GetExtraDetails(Item i)
+        {
+            if (i is Book book)
+                ExtraDetails = book.Author;
+
+            if (i is Magazine m)
+                ExtraDetails = m.PublishDate.ToString();
+            if (i is DVD d)
+                ExtraDetails = d.Duration.ToString();
+
+        }
+    }
+
+
+    public class LibraryReportBuilder
+    {
+        private LibraryFinance finance;
+        private LibraryInventory inventory;
+
+        public LibraryReportBuilder(LibraryFinance finance, LibraryInventory inventory)
+        {
+            this.finance = finance;
+            this.inventory = inventory;
+        }
+        public LibraryReportData Builder()
+        {
+            var reportData = new LibraryReportData
+            {
+                BorrowingRevenue = finance.BorrowingCurrent,
+                SellingRevenue = finance.SellingCurrent
+            };
+            foreach (var category in inventory.GetCategories())
+            {
+                var categoryData = new CategoryReportData { Category = category };
+                foreach (var item in inventory.GetAllItems(category))
+                {
+                    var itemdate = new ItemReportData
+                    {
+                        Id = item.ID,
+                        Title = item.Title,
+                        Price = item.Price,
+                        State = item.State
+                    };
+                    itemdate.GetExtraDetails(item);
+                    categoryData.Items.Add(itemdate);
+                }
+                reportData.Categories.Add(categoryData);
+            }
+            return reportData;
+        }
+    }
 
 
     public class LibraryReporting
     {
-
-        private LibraryInventory Inventory;
-        private LibraryFinance Finance;
+        private LibraryFinance finance;
+        private LibraryInventory inventory;
+        private LibraryReportBuilder reportBuilder;
 
         public LibraryReporting(LibraryFinance finance, LibraryInventory inventory)
         {
-            this.Finance = finance;
-            this.Inventory = inventory;
+            this.finance = finance;
+            this.inventory = inventory;
+            this.reportBuilder = new LibraryReportBuilder(finance, inventory);
         }
 
         public void DisplayLibraryStatus()
         {
-            Console.WriteLine("\n" + new string('=', 60));
-            Console.WriteLine("                 LIBRARY STATUS REPORT");
-            Console.WriteLine(new string('=', 60));
+            var reportData = reportBuilder.Builder();
 
-            if (this.Inventory.IsEmpty())
+            Console.WriteLine("----- Library Status Report -----");
+            Console.WriteLine($"Total Borrowing Revenue: ${reportData.BorrowingRevenue:F2}");
+            Console.WriteLine($"Total Selling Revenue: ${reportData.SellingRevenue:F2}");
+            Console.WriteLine($"Overall Total Revenue: ${reportData.TotalRevenue:F2}");
+            Console.WriteLine();
+
+            foreach (var category in reportData.Categories)
             {
-                Console.WriteLine("Library is empty!");
-                return;
-            }
-
-            foreach (var category in this.Inventory.GetCategories())
-            {
-                Console.WriteLine($"\n📚 CATEGORY: {category.ToUpper()}");
-                Console.WriteLine(new string('-', 40));
-
-                foreach (var entry in this.Inventory.GetItemsInCategory(category))
+                Console.WriteLine($"Category: {category.Category}");
+                foreach (var item in category.Items)
                 {
-                    Console.WriteLine($"ID: {entry.Item.ID} | Title: {entry.Item.Title}");
-                    Console.WriteLine($"   Price: ${entry.Item.Price} | Quantity: {entry.Quantity} | State: {entry.State}");
-
-                    // Display specific item details
-                    if (entry.Item is Book book)
-                    {
-                        Console.WriteLine($"   Author: {book.Auther}");
-                    }
-                    else if (entry.Item is Magazine magazine)
-                    {
-                        Console.WriteLine($"   Publish Date: {magazine.PublishDate}");
-                    }
-                    else if (entry.Item is DVD dvd)
-                    {
-                        Console.WriteLine($"   Duration: {dvd.Duration} hours");
-                    }
-                    Console.WriteLine();
+                    Console.WriteLine($"  ID: {item.Id}, Title: {item.Title}, Price: ${item.Price:F2}, State: {item.State}, Extra: {item.ExtraDetails}");
                 }
+                Console.WriteLine();
             }
-
-            Console.WriteLine(new string('=', 60));
-            Console.WriteLine("💰 FINANCIAL SUMMARY:");
-            Console.WriteLine($"   Money from Borrowing: ${this.Finance.BorrowingCurrent:F2}");
-            Console.WriteLine($"   Money from Selling: ${this.Finance.SellingCurrent:F2}");
-            Console.WriteLine($"   Total Revenue: ${(this.Finance.BorrowingCurrent + this.Finance.SellingCurrent):F2}");
-            Console.WriteLine(new string('=', 60));
         }
 
         public void DisplayAvailableItems()
         {
-            Console.WriteLine("\n📖 AVAILABLE ITEMS FOR BORROWING/SELLING:");
-            Console.WriteLine(new string('-', 50));
-
-            bool hasAvailable = false;
-            foreach (var category in this.Inventory.GetCategories())
+            if (inventory.IsEmpty())
             {
-                foreach (var entry in this.Inventory.GetItemsInCategory(category))
-                {
-                    if (entry.Quantity > 0)
-                    {
-                        hasAvailable = true;
-                        Console.WriteLine($"[{category}] {entry.Item.Title} - Quantity: {entry.Quantity} - Price: ${entry.Item.Price}");
-                    }
-                }
+                Console.WriteLine("No items available in the library.");
+                return;
             }
 
-            if (!hasAvailable)
+            Console.WriteLine("----- Available Items -----");
+            foreach (var category in inventory.GetCategories())
             {
-                Console.WriteLine("No items currently available!");
+                Console.WriteLine($"Category: {category}");
+                foreach (var item in inventory.GetAllItems(category).Where(i => i.State == ItemState.Available))
+                {
+                    item.DisplayInfo();
+                }
+                Console.WriteLine();
             }
         }
+    }
+
+
+    public enum OperationType
+    {
+        Borrow,
+        Sell,
+        Return,
+        Restock
+    }
+
+
+
+
+    public class LibraryOperationRecord
+    {
+        private static int nextOperationId = 0;
+        public int operationId;
+        public int userId { get; set; }
+        public int itemId { get; set; }
+
+        public OperationType operationType { get; set; }
+        public DateTime operationDate { get; set; }
+        public int operationBerid { get; set; }
+        public LibraryOperationRecord(int itemid, int userid, OperationType type, DateTime date, int berid)
+        {
+            nextOperationId++;
+            this.operationId = nextOperationId;
+            this.itemId = itemid;
+            this.userId = userid;
+            this.operationType = type;
+            this.operationDate = date;
+            this.operationBerid = berid;
+        }
+    }
+
+
+    public class LibraryOperationHistory
+    {
+        private List<LibraryOperationRecord> records;
+
+        public LibraryOperationHistory()
+        {
+            records = new List<LibraryOperationRecord>();
+        }
+
+        public void AddRecord(LibraryOperationRecord record)
+        {
+            records.Add(record);
+        }
+
+        public IEnumerable<LibraryOperationRecord> GetAllRecords()
+        {
+            return records;
+        }
+    }
+
+
+
+
+
+    public interface ITransaction
+    {
+        public void Execute(string category, string itemTitle, int userId, int itemId, decimal charge, int berid);
+    }
+
+    public class BorrowingTransaction : ITransaction
+    {
+        private readonly LibraryFinance finance;
+        private readonly LibraryInventory inventory;
+        private readonly LibraryOperationHistory history;
+
+        public BorrowingTransaction(LibraryFinance f, LibraryInventory inv, LibraryOperationHistory his)
+        {
+            this.finance = f;
+            this.history = his;
+            this.inventory = inv;
+        }
+
+        public void Execute(string category, string itemTitle, int userId, int itemId, decimal charge, int berid)
+        {
+            LibraryOperationRecord libraryOperationRecord = new LibraryOperationRecord(itemId, userId, OperationType.Borrow, DateTime.Now, berid);
+            try
+            {
+                Item i = this.inventory.BorrowItem(category, itemTitle);
+
+                try
+                {
+                    this.finance.FinancialBorrowingTransaction(charge);
+                    this.history.AddRecord(libraryOperationRecord);
+                    Console.WriteLine("Borrowing transaction completed successfully");
+                }
+                catch (Exception err)
+                {
+                    this.inventory.ReturnItem(category, itemTitle, i);
+                    Console.WriteLine(err);
+                }
+            }
+            catch (Exception err)
+            {
+                Console.WriteLine(err);
+                throw;
+            }
+
+        }
+
 
 
 
     }
 
 
+    public class SellingTransaction : ITransaction
+    {
+        private readonly LibraryFinance finance;
+        private readonly LibraryInventory inventory;
+        private readonly LibraryOperationHistory history;
+
+        public SellingTransaction(LibraryFinance f, LibraryInventory inv, LibraryOperationHistory his)
+        {
+            this.finance = f;
+            this.history = his;
+            this.inventory = inv;
+        }
+
+        public void Execute(string category, string itemTitle, int userId, int itemId, decimal charge, int berid)
+        {
+            try
+            {
+                Item i = inventory.SellItem(category, itemTitle);
+                try
+                {
+                    finance.FinancialSellingTransaction(charge);
+                    LibraryOperationRecord libraryOperationRecord = new LibraryOperationRecord(itemId, userId, OperationType.Sell, DateTime.Now, berid);
+                    history.AddRecord(libraryOperationRecord);
+                    Console.WriteLine("Item Sold Successfully");
+                }
+                catch (Exception err)
+                {
+                    inventory.ReturnItem(category, itemTitle, i);
+                    Console.WriteLine(err);
+                }
+            }
+            catch (Exception err)
+            {
+                Console.WriteLine(err);
+            }
+
+        }
+
+}
+
+    public class ReturnTransaction : ITransaction
+    {
+
+        private readonly LibraryFinance finance;
+        private readonly LibraryInventory inventory;
+        private readonly LibraryOperationHistory history;
+
+        public ReturnTransaction(LibraryFinance f, LibraryInventory inv, LibraryOperationHistory his)
+        {
+            this.finance = f;
+            this.history = his;
+            this.inventory = inv;
+        }
 
 
+        public void Execute(string category, string itemTitle, int userId, int itemId, decimal charge, int berid)
+        {
+    
+}
+
+
+
+
+}
 
 
     public class Library
@@ -668,6 +681,8 @@ public class SoldItemException : Exception
         private LibraryFinance finance;
         private LibraryInventory inventory;
         private LibraryReporting report;
+        private LibraryOperationHistory history;
+        private Dictionary<OperationType, ITransaction> Transactions;
 
 
         public Library()
@@ -675,47 +690,32 @@ public class SoldItemException : Exception
             inventory = new LibraryInventory();
             finance = new LibraryFinance();
             report = new LibraryReporting(finance, inventory);
+            history = new LibraryOperationHistory();
+            Transactions = new Dictionary<OperationType, ITransaction>
+            {
+                {OperationType.Borrow,new BorrowingTransaction(finance,inventory,history)},
+                {OperationType.Sell,new SellingTransaction(finance,inventory,history)}
+            };
         }
 
 
         public void AddNewItem(string key, Item i, int quantity)
         {
             this.inventory.AddNewItem(key, i, quantity);
-            var libitem = inventory.GetItem(key, i.ID);
-            Console.WriteLine($"Restocked {libitem.Item.Title}. New quantity: {libitem.Quantity}");
+            Console.WriteLine($"Item added successfully");
 
         }
 
-        public void BorrowItem(string category, int itemId)
+        public void ExecTransation(OperationType operationType, string category, string itemTitle, int userId, int itemId, decimal charge, int berid,Item item)
         {
-            try
-            {
-                var libitem = this.inventory.GetItem(category, itemId);
-                this.inventory.BorrowItem(category, itemId);
+            if (operationType is OperationType ot)
 
-                this.finance.FinancialBorrowingTransaction(libitem.Item.Price);
-                Console.WriteLine("Borrow transaction completed successfully");
-            }
-            catch (Exception err)
-            {
-                Console.WriteLine(err);
-            }
-        }
+                Transactions[operationType].Execute(category, itemTitle, userId, itemId, charge, berid,item);
 
-        public void SellItem(string category, int itemId)
-        {
-            try
-            {
-                var libitem = this.inventory.GetItem(category, itemId);
-                this.inventory.SellItem(category, itemId);
+            else
+                Console.WriteLine("unsupported operation");
 
-                this.finance.FinancialSellingTransaction(libitem.Item.Price);
-                Console.WriteLine("Selling transaction completed successfully");
-            }
-            catch (Exception err)
-            {
-                Console.WriteLine(err);
-            }
+
         }
 
         public void ReturnItem(string category, int itemId)
@@ -766,13 +766,13 @@ public class SoldItemException : Exception
         Borrowed,
     }
 
-    public class Customer : User
-    {
-        private class CustomerItem
+        public class CustomerItem
         {
             public Item item { get; set; }
             public CustomerItemState customerItemState { get; set; }
         }
+    public class Customer : User
+    {
 
         private List<CustomerItem> CustomerItems;
 
@@ -898,4 +898,15 @@ public class SoldItemException : Exception
 
 
 }
+
+
+
+
+
+
+
+
+
+
+
 
