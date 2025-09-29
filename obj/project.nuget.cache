@@ -1,8 +1,10 @@
 {
   "version": 2,
-  "dgSpecHash": "KoEDty3q0v4=",
+  "dgSpecHash": "Ad//Bp186A0=",
   "success": true,
   "projectFilePath": "/home/ziad/git/LiibraryManagmetSystem/Program.csproj",
-  "expectedPackageFiles": [],
+  "expectedPackageFiles": [
+    "/home/ziad/.nuget/packages/microsoft.aspnetcore.app.ref/9.0.9/microsoft.aspnetcore.app.ref.9.0.9.nupkg.sha512"
+  ],
   "logs": []
 }
